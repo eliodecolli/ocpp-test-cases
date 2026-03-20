@@ -1,0 +1,347 @@
+C09 - Authorization by GroupId
+Test Cases
+===============================================================================
+
+OVERVIEW
+--------
+Use case C09 covers how a Charging Station authorizes actions based on a shared
+GroupId. Two EV drivers with different IdTokens (e.g., separate RFID cards) can
+share the same GroupIdToken, allowing either driver to stop a transaction started
+by the other. The CSMS returns the GroupIdToken in AuthorizeResponse, and the
+Charging Station uses GroupId matching to determine whether a stop is authorized.
+
+===============================================================================
+
+TC-C09-001: Happy Path - EV Driver 2 Stops a Transaction Started by EV Driver 1
+----------------------------------------------------------------------------------
+Title: Successful cross-driver stop using matching GroupId (both tokens unknown locally)
+
+Description:
+Two EV drivers share the same GroupId. Driver 1 starts a transaction. Driver 2
+presents their card to stop it. Neither token is in the Local Authorization List
+or Authorization Cache, so the Charging Station contacts the CSMS both times.
+
+Steps:
+1. EV Driver 1 presents IdToken 001 at the Charging Station.
+2. The Charging Station checks its Local Authorization List and Authorization Cache;
+   IdToken 001 is not found.
+3. The Charging Station sends an AuthorizeRequest to the CSMS with IdToken = 001.
+4. The CSMS replies with AuthorizeResponse containing groupIdToken = 123 and
+   status = Accepted.
+5. The Charging Station stores the GroupIdToken 123 alongside IdToken 001.
+6. The Charging Station sends a TransactionEventRequest (eventType = Started,
+   triggerReason = Authorized) to the CSMS.
+7. The CSMS replies with TransactionEventResponse.
+8. EV Driver 2 presents IdToken 002 at the Charging Station to stop the transaction.
+9. Because IdToken 002 is different from IdToken 001 and is not found in the Local
+   Authorization List or Authorization Cache, the Charging Station sends an
+   AuthorizeRequest with IdToken = 002.
+10. The CSMS replies with AuthorizeResponse containing groupIdToken = 123 and
+    status = Accepted.
+11. The Charging Station matches groupIdToken 123 from both responses.
+12. The Charging Station sends a TransactionEventRequest (eventType = Ended,
+    triggerReason = StopAuthorized, stoppedReason = Local).
+13. The CSMS replies with TransactionEventResponse.
+
+Expected Result:
+- The transaction is stopped successfully by EV Driver 2.
+- Both AuthorizeResponse messages contain groupIdToken = 123.
+- The TransactionEventResponse for the Ended event is received.
+- The GroupId is now known to the Charging Station.
+
+
+TC-C09-002: Happy Path - Driver 1 Stops Their Own Transaction (Same IdToken)
+------------------------------------------------------------------------------
+Title: Authorized stop where the stopping IdToken matches the starting IdToken
+
+Description:
+EV Driver 1 starts a transaction and later stops it using the same IdToken.
+No cross-driver authorization is needed.
+
+Steps:
+1. EV Driver 1 presents IdToken 001 to start a transaction.
+2. The Charging Station authorizes (locally or via CSMS) and starts the transaction.
+3. EV Driver 1 presents IdToken 001 again to stop the transaction.
+4. The Charging Station recognizes the stopping IdToken as identical to the starting
+   IdToken.
+5. The Charging Station ends the transaction authorization without sending an
+   AuthorizeRequest to the CSMS.
+6. The Charging Station sends a TransactionEventRequest (eventType = Ended).
+7. The CSMS replies with TransactionEventResponse.
+
+Expected Result:
+- The transaction is stopped immediately without an AuthorizeRequest being sent.
+- No additional CSMS round-trip occurs for the stop action.
+
+
+TC-C09-003: Happy Path - Both Tokens in Local Authorization List or Cache with Matching GroupId
+------------------------------------------------------------------------------------------------
+Title: Stop authorized locally when both tokens are cached with the same GroupId
+
+Description:
+Both IdToken 001 (used to start) and IdToken 002 (used to stop) are present in
+the Local Authorization List or Authorization Cache and share the same GroupIdToken.
+The Charging Station MAY skip the AuthorizeRequest to the CSMS.
+
+Steps:
+1. EV Driver 1 presents IdToken 001. The Charging Station finds it in the Local
+   Authorization List or Authorization Cache with groupIdToken = 123 and status =
+   Accepted.
+2. The Charging Station starts the transaction locally without contacting the CSMS.
+3. EV Driver 2 presents IdToken 002 to stop the transaction.
+4. The Charging Station looks up IdToken 002 in the Local Authorization List or
+   Authorization Cache, finds it with groupIdToken = 123 and status = Accepted.
+5. The groupIdToken 123 matches the one used to start the transaction.
+6. The Charging Station ends the transaction authorization without sending an
+   AuthorizeRequest (per C09.FR.07).
+7. The Charging Station sends a TransactionEventRequest (eventType = Ended,
+   triggerReason = StopAuthorized).
+
+Expected Result:
+- The transaction is stopped without any AuthorizeRequest being sent to the CSMS.
+- The match is made entirely using local data.
+
+
+TC-C09-004: Happy Path - CSMS Includes GroupIdToken in TransactionEventResponse
+---------------------------------------------------------------------------------
+Title: GroupIdToken is returned in TransactionEventResponse when IdToken has an associated GroupId
+
+Description:
+When a TransactionEventRequest contains an IdToken that has an associated
+groupIdToken, the CSMS must include the groupIdToken in the response.
+
+Steps:
+1. EV Driver 1 starts a transaction; the IdToken has an associated groupIdToken.
+2. The Charging Station sends a TransactionEventRequest containing the IdToken.
+3. The CSMS processes the request.
+4. The CSMS sends back a TransactionEventResponse.
+
+Expected Result:
+- The TransactionEventResponse includes the groupIdToken.
+- This applies to both the Started and Ended event responses.
+
+
+TC-C09-005: Happy Path - GroupId Stored in Authorization Cache
+---------------------------------------------------------------
+Title: GroupId mechanism works when tokens are retrieved from Authorization Cache
+
+Description:
+Validates that groupId matching works via the Authorization Cache, not just the
+Local Authorization List.
+
+Steps:
+1. EV Driver 1 presents IdToken 001. The Charging Station sends an AuthorizeRequest.
+   The CSMS responds with groupIdToken = 123, status = Accepted. The Charging Station
+   caches this result in the Authorization Cache.
+2. A transaction is started.
+3. EV Driver 2 presents IdToken 002. The Charging Station finds IdToken 002 in the
+   Authorization Cache with groupIdToken = 123 and status = Accepted.
+4. The GroupId matches; the Charging Station ends the transaction without sending
+   an AuthorizeRequest.
+
+Expected Result:
+- The stop is authorized using cached GroupId data.
+- No AuthorizeRequest is sent for the stop action.
+
+
+TC-C09-006: Failure - Stopping IdToken Has Same GroupId But Status Is Not Accepted
+------------------------------------------------------------------------------------
+Title: Stop rejected when GroupId matches but authorization status is not Accepted
+
+Description:
+EV Driver 2 presents a token with the same GroupId as Driver 1, but the CSMS
+returns a non-Accepted status (e.g., Blocked, Expired, Invalid). The Charging
+Station must not stop the transaction.
+
+Steps:
+1. EV Driver 1 presents IdToken 001 and starts a transaction (status = Accepted,
+   groupIdToken = 123).
+2. EV Driver 2 presents IdToken 002.
+3. The Charging Station sends an AuthorizeRequest for IdToken 002.
+4. The CSMS responds with groupIdToken = 123 but status = Blocked (or Expired or
+   Invalid, i.e., anything other than Accepted).
+5. The Charging Station checks the authorization result.
+
+Expected Result:
+- The Charging Station does NOT stop the transaction (per C09.FR.11).
+- The transaction continues as if no valid stop request was made.
+- No TransactionEventRequest with eventType = Ended is sent as a result of this
+  stop attempt.
+
+
+TC-C09-007: Failure - Stopping IdToken Has Different GroupId
+-------------------------------------------------------------
+Title: Stop rejected when the stopping IdToken belongs to a different group
+
+Description:
+EV Driver 2 presents a token that is authorized (status = Accepted) but has a
+different GroupId than the token used to start the transaction.
+
+Steps:
+1. EV Driver 1 presents IdToken 001 and starts a transaction (groupIdToken = 123).
+2. EV Driver 2 presents IdToken 002.
+3. The Charging Station sends an AuthorizeRequest for IdToken 002.
+4. The CSMS responds with groupIdToken = 999 (different from 123) and status =
+   Accepted.
+5. The Charging Station compares groupIdToken values: 999 does not match 123.
+
+Expected Result:
+- The Charging Station does NOT authorize EV Driver 2 to stop the transaction.
+- The transaction remains active.
+- The GroupId mismatch is the sole reason for rejection.
+
+
+TC-C09-008: Failure - CSMS Does Not Return GroupIdToken in AuthorizeResponse
+------------------------------------------------------------------------------
+Title: AuthorizeResponse omits GroupIdToken when IdToken has an associated group
+
+Description:
+Tests non-compliance where the CSMS fails to include the groupIdToken in the
+AuthorizeResponse, even though the IdToken has an associated groupIdToken
+(violation of C09.FR.09).
+
+Steps:
+1. EV Driver 1 presents IdToken 001, which is known to have an associated
+   groupIdToken on the CSMS side.
+2. The Charging Station sends an AuthorizeRequest.
+3. The CSMS returns an AuthorizeResponse with status = Accepted but without a
+   groupIdToken field.
+
+Expected Result:
+- This represents a protocol violation by the CSMS.
+- The Charging Station cannot store a GroupId for this token.
+- A subsequent attempt by EV Driver 2 to stop the transaction using GroupId
+  matching will fail because no GroupId was recorded for the starting token.
+
+
+TC-C09-009: Edge Case - Stopping Token Not in Cache/List, AuthorizeRequest Is Mandatory
+-----------------------------------------------------------------------------------------
+Title: Charging Station must send AuthorizeRequest when stopping token is not cached locally
+
+Description:
+EV Driver 2's IdToken is not present in either the Local Authorization List or
+the Authorization Cache. The Charging Station must contact the CSMS (C09.FR.05).
+
+Steps:
+1. EV Driver 1 starts a transaction with IdToken 001 (groupIdToken = 123, stored
+   locally or returned from CSMS).
+2. EV Driver 2 presents IdToken 002, which is not in the Local Authorization List
+   or Authorization Cache.
+3. The stopping IdToken is different from the starting IdToken.
+
+Expected Result:
+- The Charging Station sends an AuthorizeRequest for IdToken 002 to the CSMS
+  (this is mandatory, not optional).
+- The transaction is only stopped if the CSMS returns groupIdToken = 123 and
+  status = Accepted.
+
+
+TC-C09-010: Edge Case - AuthorizeRequest Optional When Both Tokens Are Locally Known
+--------------------------------------------------------------------------------------
+Title: AuthorizeRequest to CSMS is optional when both tokens with GroupIds are cached
+
+Description:
+Verifies that when both IdTokens (start and stop) along with their GroupIdTokens
+are present in the Local Authorization List or Authorization Cache and have the
+same GroupId, the Charging Station is allowed (but not required) to skip the
+AuthorizeRequest (per C09.FR.04).
+
+Steps:
+1. EV Driver 1 starts a transaction with IdToken 001 (groupIdToken = 123, present
+   in Local Authorization List with status = Accepted).
+2. EV Driver 2 presents IdToken 002. IdToken 002 is found in the Local Authorization
+   List or Authorization Cache with groupIdToken = 123 and status = Accepted.
+3. Both GroupIdTokens match.
+
+Expected Result:
+- The Charging Station may stop the transaction without sending an AuthorizeRequest.
+- If it does send an AuthorizeRequest, this is also acceptable behavior.
+- The transaction is stopped successfully either way.
+
+
+TC-C09-011: Edge Case - GroupId Is a Shared Central Account Identifier (Not an IdToken)
+------------------------------------------------------------------------------------------
+Title: GroupId is a central account identifier rather than one of the member IdTokens
+
+Description:
+The remark in C09 notes that GroupId may be a shared central account identifier
+rather than one of the IdTokens in the group. This test verifies the system
+handles a GroupId that does not correspond to any individual driver's IdToken.
+
+Steps:
+1. EV Driver 1 has IdToken 001 associated with groupIdToken = ACCOUNT-XYZ (a
+   central account ID, not a personal token).
+2. EV Driver 2 has IdToken 002 also associated with groupIdToken = ACCOUNT-XYZ.
+3. EV Driver 1 starts a transaction. The CSMS returns groupIdToken = ACCOUNT-XYZ.
+4. EV Driver 2 presents IdToken 002 to stop the transaction.
+5. The CSMS returns groupIdToken = ACCOUNT-XYZ for IdToken 002.
+
+Expected Result:
+- The GroupIds match (ACCOUNT-XYZ = ACCOUNT-XYZ).
+- The stop is authorized successfully.
+- The system does not require the GroupId to be one of the driver's own IdTokens.
+
+
+TC-C09-012: Edge Case - Prerequisite Not Met: Drivers Have Different GroupIds
+------------------------------------------------------------------------------
+Title: Cross-driver stop fails when the two drivers do not share a GroupId
+
+Description:
+Validates that if the prerequisite of C09 (both drivers must share a GroupId) is
+not met, the authorization-by-GroupId mechanism does not apply and the stop is
+not granted based on GroupId.
+
+Steps:
+1. EV Driver 1 (IdToken 001, groupIdToken = 123) starts a transaction.
+2. EV Driver 2 (IdToken 002, groupIdToken = 456) attempts to stop the transaction.
+3. The Charging Station obtains both GroupIds (either from cache or via CSMS).
+4. The Charging Station compares groupIdToken 123 and 456.
+
+Expected Result:
+- GroupIds do not match.
+- EV Driver 2 is not authorized to stop the transaction.
+- The transaction remains active.
+
+
+TC-C09-013: Edge Case - AuthorizeResponse Includes GroupIdToken and Status
+---------------------------------------------------------------------------
+Title: AuthorizeResponse always includes both groupIdToken and an authorization status
+
+Description:
+Verifies compliance with C09.FR.09 and C09.FR.10, which together require that
+when an IdToken has a groupIdToken, the AuthorizeResponse includes both the
+groupIdToken and a status value.
+
+Steps:
+1. EV Driver 1 presents IdToken 001, which has an associated groupIdToken on the
+   CSMS.
+2. The Charging Station sends an AuthorizeRequest.
+3. The CSMS processes the request and sends an AuthorizeResponse.
+
+Expected Result:
+- The AuthorizeResponse contains a groupIdToken field.
+- The AuthorizeResponse contains a status field with a valid authorization status
+  (e.g., Accepted, Blocked, Expired, Invalid, etc.).
+- Both fields are present regardless of whether the status is Accepted or not.
+
+
+TC-C09-014: Edge Case - No AuthorizeRequest Sent When C09.FR.07 Conditions Are Met
+-------------------------------------------------------------------------------------
+Title: Charging Station skips AuthorizeRequest when local cache confirms same GroupId
+
+Description:
+Per C09.FR.07, if the presented stop IdToken is found in the Local Authorization
+List or Authorization Cache with a valid status and the same GroupIdToken as the
+starting token, no AuthorizeRequest shall be sent to the CSMS.
+
+Steps:
+1. EV Driver 1 starts a transaction with IdToken 001 (groupIdToken = 123).
+2. EV Driver 2 presents IdToken 002.
+3. The Charging Station looks up IdToken 002 and finds it in the Local Authorization
+   List with groupIdToken = 123, status = Accepted.
+4. groupIdToken 123 matches the one stored for the starting token.
+
+Expected Result:
+- The Charging Station does NOT send an AuthorizeRequest to the CSMS.
+- The transaction is stopped immediately based on local information.
+- This is a mandatory behavior (SHALL), not optional.

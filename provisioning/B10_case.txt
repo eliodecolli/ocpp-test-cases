@@ -1,0 +1,106 @@
+B10 - Migrate to new CSMS - Test Cases
+
+GOAL: Allow the CSMS to instruct a Charging Station to connect to a new CSMS by changing the priority order of NetworkConnectionProfiles. The migration takes effect after a reboot.
+
+================================================================================
+
+TEST CASE 1: Successfully migrate to a new CSMS — happy path
+Scenario: CSMS 1 updates the NetworkConfigurationPriority so the Charging Station connects to CSMS 2 after reboot.
+Steps:
+  1. CSMS 1 sends SetVariablesRequest updating NetworkConfigurationPriority so that the profile for CSMS 2 is first.
+  2. Charging Station responds with SetVariablesResponse(status = Accepted or RebootRequired).
+  3. CSMS 1 sends ResetRequest(OnIdle).
+  4. Charging Station reboots.
+  5. Charging Station connects to CSMS 2 (new first entry in the priority list).
+Expected result:
+  - After reboot, Charging Station connects to CSMS 2.
+  - Charging Station sends BootNotificationRequest to CSMS 2.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 2: Invalid NetworkConfigurationPriority — request rejected
+Scenario: The SetVariablesRequest references NetworkProfile slots that do not have valid configurations.
+Steps:
+  1. CSMS sends SetVariablesRequest with NetworkConfigurationPriority containing an invalid slot reference.
+  2. Charging Station validates the request.
+Expected result:
+  - Charging Station responds with SetVariablesResponse(status = Rejected).
+  - Optional statusInfo provides additional detail.
+  - Priority order is not changed.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 3: All NetworkProfile slots are valid — Accepted or RebootRequired
+Scenario: CSMS sends a valid NetworkConfigurationPriority update.
+Steps:
+  1. CSMS sends SetVariablesRequest with valid NetworkProfile slots in the new priority order.
+  2. Charging Station validates all slots.
+Expected result:
+  - Charging Station responds with SetVariablesResponse(status = Accepted or RebootRequired).
+
+--------------------------------------------------------------------------------
+
+TEST CASE 4: After reboot, station starts connecting from first entry in priority list
+Scenario: Verify the Charging Station uses the updated priority list after booting.
+Steps:
+  1. Priority list is updated (B09 or B10) and the station reboots.
+  2. Charging Station attempts to connect.
+Expected result:
+  - Charging Station attempts to connect to the first entry in NetworkConfigurationPriority.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 5: Connection to new CSMS fails — retry per NetworkProfileConnectionAttempts
+Scenario: The first entry in the priority list is unreachable.
+Steps:
+  1. Charging Station reboots and tries to connect to CSMS 2 (first in list).
+  2. Connection fails.
+  3. Charging Station retries per the NetworkProfileConnectionAttempts configuration.
+Expected result:
+  - Charging Station makes the configured number of attempts for that entry before moving to the next.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 6: All connection attempts fail — fallback to last successful profile
+Scenario: The Charging Station cannot connect to any entry in the priority list.
+Steps:
+  1. All entries in NetworkConfigurationPriority fail after their respective retry attempts.
+Expected result:
+  - Charging Station falls back and starts reconnecting to the NetworkConnectionProfile for which the last successful connection was made.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 7: Station disconnects from old CSMS before connecting to new one
+Scenario: The Charging Station must not attempt to connect to the new CSMS while still connected to the old one.
+Steps:
+  1. Charging Station is currently connected to CSMS 1.
+  2. After reboot or priority change takes effect, Charging Station begins migration.
+Expected result:
+  - Charging Station disconnects from CSMS 1 before attempting to connect to CSMS 2.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 8: Recommended — set station Inoperative before reset to avoid split transactions
+Scenario: CSMS wants to ensure no transactions are split between CSMS 1 and CSMS 2.
+Steps:
+  1. CSMS 1 sends ChangeAvailabilityRequest to set Charging Station to Inoperative.
+  2. CSMS 1 waits until no ongoing transactions remain (optionally using getTransactionStatusRequest).
+  3. CSMS 1 sends ResetRequest(OnIdle).
+  4. Charging Station reboots and connects to CSMS 2.
+Expected result:
+  - No transactions are started after the station becomes Inoperative.
+  - Transaction message queue is empty before migration.
+  - CSMS 2 receives complete transaction history.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 9: Even if changes are made to the currently active profile, they take effect only after reboot
+Scenario: CSMS modifies the currently active NetworkConnectionProfile via SetNetworkProfile.
+Steps:
+  1. CSMS sends SetNetworkProfileRequest to update the currently active profile.
+  2. Charging Station stores the change but keeps the existing connection.
+Expected result:
+  - The existing connection is not immediately affected.
+  - The change takes effect only after a reboot.
+
+--------------------------------------------------------------------------------

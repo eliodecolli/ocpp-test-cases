@@ -1,0 +1,306 @@
+C06 - Authorization using Local Id Type - Test Cases
+======================================================
+Protocol: OCPP 2.0.1 | Functional Block: C. Authorization
+Goal: Enable a Charging Station to start and stop charging using a locally generated
+IdToken (e.g., a parking ticket), without requiring an RFID card.
+
+======================================================
+HAPPY PATH TEST CASES
+======================================================
+
+TC-C06-01: Successful authorization and charging session with parking ticket
+-----------------------------------------------------------------------------
+Title: Full happy-path session - parking ticket start to payment stop
+
+Scenario:
+An EV driver enters a garage, takes a parking ticket, parks at a Charging Station,
+uses the ticket to start charging, later pays at a kiosk, and the session is stopped
+remotely by the payment terminal via the CSMS.
+
+Steps:
+1. The EV driver collects a parking ticket at the garage entrance barrier.
+2. The driver parks the EV at a Charging Station and plugs in the charging cable.
+3. The driver scans or inserts the parking ticket at the Charging Station.
+4. The Charging Station generates a Local IdToken from the parking ticket data.
+5. The Charging Station sends an AuthorizeRequest to the CSMS containing the Local IdToken.
+6. The CSMS receives the AuthorizeRequest and evaluates the token.
+7. The CSMS responds with an AuthorizeResponse containing status "Accepted".
+8. The Charging Station begins supplying energy to the EV.
+9. The driver leaves. The EV continues to charge.
+10. The driver returns and inserts the parking ticket into the payment kiosk.
+11. The driver pays for parking and charging.
+12. The payment terminal sends a stop command to the CSMS.
+13. The CSMS relays the stop command to the Charging Station.
+14. The Charging Station stops the charging session.
+15. The driver unplugs the cable and drives away.
+
+Expected Result:
+- The AuthorizeRequest is sent with IdTokenType = Local.
+- The CSMS returns AuthorizeResponse with status = Accepted.
+- Energy is delivered only after authorization is received.
+- The charging session stops cleanly upon the remote stop command from the payment terminal.
+- The driver can unplug and leave without error.
+
+----------------------------------------------------------------------
+
+TC-C06-02: CSMS accepts authorization on first attempt
+-------------------------------------------------------
+Title: AuthorizeRequest accepted immediately with no delay
+
+Scenario:
+The CSMS is online and responds promptly to an AuthorizeRequest for a Local IdToken.
+
+Steps:
+1. Driver plugs in EV and presents a parking ticket at the Charging Station.
+2. Charging Station sends AuthorizeRequest with IdTokenType = Local to the CSMS.
+3. CSMS immediately responds with AuthorizeResponse status = Accepted.
+4. Charging Station starts delivering energy.
+
+Expected Result:
+- No perceptible delay before charging begins.
+- Energy is supplied only after the Accepted response is received.
+- No error or warning messages are generated.
+
+======================================================
+EDGE CASE TEST CASES
+======================================================
+
+TC-C06-03: Charging Station does not offer energy before authorization
+----------------------------------------------------------------------
+Title: Energy is withheld until AuthorizeResponse is received
+
+Scenario:
+Verifies that the Charging Station enforces the rule that energy must not be offered
+prior to receiving authorization (C06.FR.01).
+
+Steps:
+1. Driver plugs in the EV and presents the parking ticket.
+2. The Charging Station generates a Local IdToken and sends AuthorizeRequest.
+3. Before the AuthorizeResponse arrives, observe the Charging Station behavior.
+4. AuthorizeResponse arrives with status = Accepted.
+5. Observe when energy delivery begins.
+
+Expected Result:
+- The Charging Station does NOT supply energy before the AuthorizeResponse is received.
+- Energy delivery begins only after the Accepted status is confirmed.
+
+----------------------------------------------------------------------
+
+TC-C06-04: AuthorizeRequest used only for charging authorization purposes
+--------------------------------------------------------------------------
+Title: AuthorizeRequest is not used for non-charging purposes
+
+Scenario:
+Verifies that the AuthorizeRequest message is scoped only to authorizing identifiers
+for charging and is not sent for unrelated purposes (C06.FR.03).
+
+Steps:
+1. Observe system behavior during typical Charging Station operation.
+2. Note all instances where AuthorizeRequest messages are sent.
+3. Verify the context and purpose of each AuthorizeRequest message.
+
+Expected Result:
+- AuthorizeRequest messages are sent only when authorizing an identifier to start
+  or manage a charging session.
+- No AuthorizeRequest messages are sent for unrelated administrative tasks.
+
+----------------------------------------------------------------------
+
+TC-C06-05: Parking ticket scanned but EV not yet plugged in
+------------------------------------------------------------
+Title: Local IdToken presented before cable is connected
+
+Scenario:
+The driver scans the parking ticket at the Charging Station before plugging in the
+charging cable.
+
+Steps:
+1. Driver scans or inserts the parking ticket at the Charging Station.
+2. The Charging Station generates a Local IdToken and sends AuthorizeRequest.
+3. CSMS responds with AuthorizeResponse status = Accepted.
+4. Driver then plugs in the charging cable.
+
+Expected Result:
+- The Charging Station handles the out-of-order sequence gracefully.
+- Once the cable is plugged in and authorization is already accepted, charging begins.
+- No error causes the session to be permanently blocked.
+
+----------------------------------------------------------------------
+
+TC-C06-06: Same parking ticket used twice simultaneously at different connectors
+----------------------------------------------------------------------------------
+Title: Duplicate Local IdToken presented on two connectors at the same time
+
+Scenario:
+Two drivers (unlikely but possible in a shared-ticket scenario or a system error)
+attempt to use what appears to be the same Local IdToken on two connectors.
+
+Steps:
+1. Driver A presents parking ticket X at Connector 1.
+2. Charging Station sends AuthorizeRequest for token X to CSMS.
+3. Almost simultaneously, a second request for token X arrives (or Driver B presents
+   the same token at Connector 2).
+4. CSMS processes both AuthorizeRequests.
+
+Expected Result:
+- The CSMS evaluates each AuthorizeRequest independently.
+- The CSMS responds with an appropriate AuthorizeResponse to each request.
+- The system does not crash or enter an inconsistent state.
+- Policy-level decisions (e.g., rejecting the second use of a token) are reflected in
+  the authorization status, not in protocol errors.
+
+----------------------------------------------------------------------
+
+TC-C06-07: Driver does not return to pay - session left running
+---------------------------------------------------------------
+Title: Charging session continues indefinitely when no stop command is received
+
+Scenario:
+The driver never returns to pay, so the payment terminal never sends a stop command.
+
+Steps:
+1. Driver completes the normal authorization and charging session start.
+2. Driver does not return and does not pay.
+3. No stop command is ever sent by the payment terminal or CSMS.
+
+Expected Result:
+- The Charging Station continues charging until another mechanism intervenes
+  (e.g., a maximum session duration limit, cable disconnection, or operator action).
+- The system does not enter an error state solely because no stop command arrives.
+- The session remains in a valid, trackable state in the CSMS.
+
+======================================================
+FAILURE / REJECTION SCENARIO TEST CASES
+======================================================
+
+TC-C06-08: CSMS rejects the Local IdToken
+------------------------------------------
+Title: AuthorizeResponse returned with status other than Accepted
+
+Scenario:
+The CSMS determines that the presented Local IdToken is not valid (e.g., the parking
+ticket is expired, unknown, or already used) and rejects the authorization request.
+
+Steps:
+1. Driver plugs in the EV and presents the parking ticket.
+2. Charging Station sends AuthorizeRequest with IdTokenType = Local to the CSMS.
+3. CSMS responds with AuthorizeResponse and an authorization status indicating
+   rejection (e.g., Invalid, Expired, or Unknown).
+
+Expected Result:
+- The Charging Station receives the rejection status.
+- The Charging Station does NOT supply energy to the EV.
+- The driver is notified (e.g., via display or indicator) that authorization failed.
+- No charging session is started.
+
+----------------------------------------------------------------------
+
+TC-C06-09: CSMS is unreachable when AuthorizeRequest is sent
+-------------------------------------------------------------
+Title: No response from CSMS after AuthorizeRequest is transmitted
+
+Scenario:
+The network connection between the Charging Station and the CSMS is lost just after
+the driver presents the parking ticket, so the CSMS never receives or responds to
+the AuthorizeRequest.
+
+Steps:
+1. Driver plugs in the EV and presents the parking ticket.
+2. Charging Station attempts to send AuthorizeRequest to the CSMS.
+3. The CSMS is unreachable; no AuthorizeResponse is received.
+
+Expected Result:
+- The Charging Station does NOT supply energy (C06.FR.01 - energy only after
+  authorization).
+- The Charging Station handles the timeout gracefully without crashing.
+- The driver is informed that authorization could not be completed.
+- The Charging Station may retry or wait according to its configured behavior,
+  but must not start charging without an Accepted authorization status.
+
+----------------------------------------------------------------------
+
+TC-C06-10: CSMS receives AuthorizeRequest but does not include a status in the response
+----------------------------------------------------------------------------------------
+Title: AuthorizeResponse is malformed or missing the authorization status field
+
+Scenario:
+The CSMS responds to the AuthorizeRequest but the response is missing the required
+authorization status value (violating C06.FR.04).
+
+Steps:
+1. Driver presents parking ticket; Charging Station sends AuthorizeRequest.
+2. CSMS sends back a malformed AuthorizeResponse that does not include a valid
+   authorization status value.
+3. Charging Station attempts to parse the response.
+
+Expected Result:
+- The Charging Station treats the missing or invalid status as a failed authorization.
+- No energy is supplied to the EV.
+- An error or warning is logged at the Charging Station and/or CSMS.
+
+----------------------------------------------------------------------
+
+TC-C06-11: Payment terminal sends stop command before driver returns
+---------------------------------------------------------------------
+Title: Remote stop issued while EV is still charging
+
+Scenario:
+The payment kiosk or an operator sends a stop command to the CSMS before the driver
+has physically returned to the Charging Station.
+
+Steps:
+1. Normal authorization and charging session are active.
+2. Payment terminal (or operator) sends a stop command to the CSMS.
+3. CSMS relays the stop command to the Charging Station.
+4. Charging Station stops energy delivery.
+5. Driver returns later to unplug the cable.
+
+Expected Result:
+- Energy delivery stops promptly upon receipt of the remote stop command.
+- The session is recorded as completed in the CSMS.
+- The driver can safely unplug the cable when they return.
+- No energy is supplied after the session has been stopped.
+
+----------------------------------------------------------------------
+
+TC-C06-12: Driver attempts to unplug cable while session is still active
+--------------------------------------------------------------------------
+Title: Cable disconnected by driver before payment and remote stop are completed
+
+Scenario:
+The driver unplugs the charging cable without first paying or waiting for the remote
+stop command.
+
+Steps:
+1. Normal authorization and charging session are active.
+2. Driver physically disconnects the charging cable from the EV or the Charging Station.
+3. Charging Station detects the cable disconnect event.
+
+Expected Result:
+- The Charging Station halts energy delivery immediately upon detecting the
+  cable disconnect.
+- The CSMS is notified of the unexpected session end.
+- The session is recorded with appropriate status (e.g., disconnected without proper
+  stop) so that billing or reconciliation can occur.
+
+----------------------------------------------------------------------
+
+TC-C06-13: Non-Local IdToken type presented (RFID card used instead of parking ticket)
+----------------------------------------------------------------------------------------
+Title: Authorization attempted with RFID (non-Local IdTokenType) - out of scope for C06
+
+Scenario:
+Verifies that presenting an RFID card does not trigger the Local IdToken authorization
+flow described in C06. This case is handled by a different use case, not C06.
+
+Steps:
+1. Driver presents an RFID card at the Charging Station instead of a parking ticket.
+2. Charging Station reads the IdToken with type ISO14443 (or similar RFID type),
+   not Local.
+3. Charging Station sends an AuthorizeRequest with the appropriate RFID IdTokenType.
+
+Expected Result:
+- The Charging Station processes this as a non-Local authorization flow.
+- The C06-specific Local IdToken flow is NOT triggered.
+- Authorization proceeds via the correct RFID use case.
+- No error occurs as a result of using an RFID card.

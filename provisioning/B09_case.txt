@@ -1,0 +1,90 @@
+B09 - Setting a new NetworkConnectionProfile - Test Cases
+
+GOAL: Allow the CSMS to update the connection details (NetworkConnectionProfile) on a Charging Station — for example, to prepare for migration to a new CSMS. The Charging Station validates and stores the new profile.
+
+================================================================================
+
+TEST CASE 1: Successfully set a new NetworkConnectionProfile
+Scenario: CSMS sends valid connection data that matches the Charging Station's capabilities.
+Steps:
+  1. CSMS sends SetNetworkProfileRequest(configurationSlot, connectionData) with valid data.
+  2. Charging Station receives and validates the content.
+  3. Charging Station stores the new profile.
+  4. Charging Station responds with SetNetworkProfileResponse(status = Accepted).
+Expected result:
+  - New profile is stored successfully.
+  - Status is "Accepted".
+
+--------------------------------------------------------------------------------
+
+TEST CASE 2: Reject invalid connection data
+Scenario: CSMS sends a SetNetworkProfileRequest with malformed or incompatible connection data.
+Steps:
+  1. CSMS sends SetNetworkProfileRequest with invalid connectionData (e.g., wrong format or unsupported parameters).
+  2. Charging Station validates the content.
+  3. Charging Station responds.
+Expected result:
+  - Charging Station responds with SetNetworkProfileResponse(status = Rejected).
+  - No new profile is stored.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 3: Storing the profile fails due to internal error
+Scenario: The data is valid but the Charging Station encounters an internal failure when saving it.
+Steps:
+  1. CSMS sends SetNetworkProfileRequest with valid data.
+  2. Charging Station validates the data (passes).
+  3. Charging Station fails to store the profile (e.g., storage error).
+Expected result:
+  - Charging Station responds with SetNetworkProfileResponse(status = Failed).
+
+--------------------------------------------------------------------------------
+
+TEST CASE 4: Reject a NetworkProfile with a lower security profile than current
+Scenario: The new NetworkConnectionProfile specifies a lower securityProfile than what the station currently uses.
+Steps:
+  1. The Charging Station is configured with SecurityProfile = 3 (for example).
+  2. CSMS sends SetNetworkProfileRequest with a connectionData that has securityProfile = 1.
+  3. Charging Station validates the request.
+Expected result:
+  - Charging Station responds with SetNetworkProfileResponse(status = Rejected).
+  - The existing (higher) security profile is preserved.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 5: New profile is not activated immediately — requires reboot
+Scenario: Changes to a NetworkConnectionProfile (even the currently active one) are not effective until after a reboot.
+Steps:
+  1. CSMS sends SetNetworkProfileRequest with valid new data.
+  2. Charging Station accepts and stores the data.
+  3. No reboot has occurred yet.
+Expected result:
+  - The new profile is stored but NOT yet active.
+  - The existing connection continues using the old profile.
+  - Activation happens after a reboot as described in B10.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 6: Set a profile in a specific configurationSlot
+Scenario: CSMS targets a specific slot in the connection profile list.
+Steps:
+  1. CSMS sends SetNetworkProfileRequest with a specific configurationSlot number.
+  2. Charging Station stores the profile in that slot.
+  3. Charging Station responds with status Accepted.
+Expected result:
+  - The profile is stored in the requested slot.
+  - Other slots are unaffected.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 7: Error during use case does not affect current active connection
+Scenario: If something goes wrong during SetNetworkProfile, the current connection must remain intact.
+Steps:
+  1. CSMS sends SetNetworkProfileRequest.
+  2. An error occurs (e.g., validation fails or storage fails).
+  3. Charging Station responds with Rejected or Failed.
+Expected result:
+  - The current data connection remains operational and unchanged.
+  - The error is not destructive to the active connection.
+
+--------------------------------------------------------------------------------

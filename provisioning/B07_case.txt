@@ -1,0 +1,140 @@
+B07 - Get Base Report - Test Cases
+
+GOAL: Allow the CSMS to request a predefined report from a Charging Station. The report is returned asynchronously in one or more NotifyReportRequest messages. The CSMS must support at least ConfigurationInventory and FullInventory report types.
+
+================================================================================
+
+TEST CASE 1: Request a ConfigurationInventory report
+Scenario: CSMS requests the report of all component-variables that can be set by the operator.
+Steps:
+  1. CSMS sends GetBaseReportRequest(requestId = X, reportBase = ConfigurationInventory).
+  2. Charging Station responds with GetBaseReportResponse(status = Accepted).
+  3. Charging Station sends one or more NotifyReportRequest messages with the configuration inventory data.
+  4. CSMS responds to each with NotifyReportResponse.
+Expected result:
+  - GetBaseReportResponse status is Accepted.
+  - All NotifyReportRequests contain the requestId X.
+  - Reported data covers all operator-configurable component-variables including their VariableCharacteristics.
+  - seqNo starts at 0 and increments per message.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 2: Request a FullInventory report
+Scenario: CSMS requests a complete report of ALL component-variables on the Charging Station.
+Steps:
+  1. CSMS sends GetBaseReportRequest(requestId = X, reportBase = FullInventory).
+  2. Charging Station responds with GetBaseReportResponse(status = Accepted).
+  3. Charging Station sends one or more NotifyReportRequest messages with the full inventory.
+  4. CSMS responds with NotifyReportResponse for each.
+Expected result:
+  - All component-variables are reported, including their VariableCharacteristics.
+  - All supported attribute types of each variable are reported, even if they have no value (unset).
+  - Required variables for implemented functional blocks are included.
+  - seqNo starts at 0 and increments per message.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 3: Request a SummaryInventory report
+Scenario: CSMS requests a summary of availability and condition of the Charging Station.
+Steps:
+  1. CSMS sends GetBaseReportRequest(requestId = X, reportBase = SummaryInventory).
+  2. Charging Station responds with GetBaseReportResponse(status = Accepted).
+  3. Charging Station sends one or more NotifyReportRequest messages.
+  4. CSMS responds with NotifyReportResponse for each.
+Expected result:
+  - Report includes AvailabilityState for the Charging Station, each EVSE, and each Connector (where known and different from EVSE).
+  - Report includes Active/Problem/Tripped/Overload/Fallback variables for any component in an abnormal state.
+  - Any other diagnostically relevant variables are included for components in abnormal state.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 4: Request a report type that is not supported
+Scenario: CSMS requests a reportBase that the Charging Station does not support.
+Steps:
+  1. CSMS sends GetBaseReportRequest with an unsupported reportBase value.
+  2. Charging Station processes the request.
+Expected result:
+  - Charging Station responds with GetBaseReportResponse(status = NotSupported).
+  - Charging Station does NOT send any NotifyReportRequest messages.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 5: requestId is echoed in all NotifyReportRequest messages
+Scenario: Verify that every notification part carries the same requestId as the original request.
+Steps:
+  1. CSMS sends GetBaseReportRequest(requestId = 42, reportBase = FullInventory).
+  2. Charging Station sends multiple NotifyReportRequest messages (large report).
+Expected result:
+  - Every NotifyReportRequest contains requestId = 42.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 6: seqNo starts at 0 and increments for each report part
+Scenario: Verify the sequence numbering of report messages.
+Steps:
+  1. CSMS sends GetBaseReportRequest.
+  2. Charging Station sends 3 NotifyReportRequest messages.
+Expected result:
+  - First message has seqNo = 0.
+  - Second message has seqNo = 1.
+  - Third message has seqNo = 2.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 7: Report is temporarily unavailable — station responds Rejected
+Scenario: Charging Station cannot execute the report request at this moment (e.g., busy).
+Steps:
+  1. CSMS sends GetBaseReportRequest for a supported reportBase.
+  2. Charging Station is temporarily unable to generate the report.
+Expected result:
+  - Charging Station responds with GetBaseReportResponse(status = Rejected).
+  - No NotifyReportRequest messages are sent.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 8: Charging Station supports at minimum ConfigurationInventory and FullInventory
+Scenario: Verify the mandatory report types are supported.
+Steps:
+  1. CSMS sends GetBaseReportRequest(reportBase = ConfigurationInventory).
+  2. CSMS sends GetBaseReportRequest(reportBase = FullInventory).
+Expected result:
+  - Both requests are accepted (status = Accepted).
+  - Both result in NotifyReportRequest messages.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 9: CSMS requests FullInventory on first connection or after firmware update
+Scenario: CSMS should request a FullInventory when device model may have changed.
+Steps:
+  1. Charging Station connects to CSMS for the first time (or after a firmware update or hardware change).
+  2. CSMS sends GetBaseReportRequest(reportBase = FullInventory).
+  3. Charging Station responds and sends the report asynchronously.
+Expected result:
+  - FullInventory is successfully retrieved.
+  - CSMS now has an up-to-date picture of all device model components and variables.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 10: Report delivered in multiple parts (tbc = true then false)
+Scenario: A large report is split into multiple NotifyReportRequest messages.
+Steps:
+  1. CSMS sends GetBaseReportRequest.
+  2. Charging Station sends 3 NotifyReportRequest messages; the first two have tbc = true (to be continued) and the last has tbc = false.
+  3. CSMS acknowledges each with NotifyReportResponse.
+Expected result:
+  - CSMS receives and processes all 3 parts.
+  - Final message (tbc = false) signals the report is complete.
+  - All parts have the correct requestId and incremental seqNo.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 11: FullInventory — unset attribute types are still reported
+Scenario: A variable supports multiple attribute types (Actual, Target, etc.) but some have no value yet.
+Steps:
+  1. CSMS requests FullInventory.
+  2. Charging Station has a variable with a supported but unset Target attribute.
+Expected result:
+  - The Target attribute is included in the NotifyReportRequest even though it has no value.
+  - This allows the CSMS to know which attribute types are supported.
+
+--------------------------------------------------------------------------------

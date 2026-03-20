@@ -1,0 +1,260 @@
+E06 - Stop Transaction options.
+E06 - Stop Transaction options.
+E06 - Stop Transaction options
+Table 106. E06 - Stop Transaction
+No. Type Description
+1 Name Stop Transaction options
+2 ID E06
+Functional block E. Transactions
+3 Objective(s) To inform the CSMS that a transaction at the Charging Station has stopped.
+4 Description This use case describes the different moment a Charging Station can stop a transaction (send
+TransactionEventRequest (eventType = Ended), depending on the configuration of the Charging
+Station.
+5 Actors Charging Station, CSMS, EV Driver
+S1 Scenario objective Stop a transaction when a parking bay occupancy no longer detector detects the EV.
+Scenario description 1. The Charging Stations parking bay occupancy detector stops detecting the EV.
+2. The Charging Station sends a TransactionEventRequest (eventType = Ended) notifying the
+CSMS about a transaction that has ended.
+3. The CSMS responds with a TransactionEventResponse, confirming that the
+TransactionEventRequest was received.
+Prerequisite(s) A transaction is ongoing.
+Configuration Variable: TxStopPoint contains: ParkingBayOccupancy
+Postcondition(s) Successful postcondition:
+The transaction is ended and the CSMS is Successfully informed.
+Failure postcondition:
+The transaction is still ongoing. or
+The CSMS is not informed.
+Charging Station CSMS
+A transaction is ongoing.
+parking bay detector
+no longer detects the EV
+TransactionEventRequest(eventType = Ended,
+triggerReason = EVDeparted, stoppedReason = Local, ...)
+TransactionEventResponse()
+Figure 50. Sequence Diagram: Stop Transaction options - ParkingBayOccupancy
+S2 Scenario objective Stop a transaction when communication between the Charging Station and the EV is lost. (for
+example: cable unplugged)
+Scenario description 1. Communication between Charging Station and the EV is lost (Charging cable is unplugged).
+2. If charging cable unplugged on the Charging Station side: send StatusNotificationRequest to
+the CSMS to inform it about a Connector that became Available.
+3. The Charging Station sends a TransactionEventRequest (eventType = Ended) notifying the
+CSMS about a transaction that has ended.
+4. The CSMS responds with a TransactionEventResponse, confirming that the
+TransactionEventRequest was received.
+Prerequisite(s) A transaction is ongoing.
+Configuration Variable: TxStopPoint contains: EVConnected
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 142/471 Part 2 - Specification
+S2 Scenario objective Stop a transaction when communication between the Charging Station and the EV is lost. (for
+example: cable unplugged)
+Postcondition(s) Successful postcondition:
+The transaction is ended and the CSMS is Successfully informed.
+Failure postcondition:
+The transaction is still ongoing. or
+The CSMS is not informed.
+EV Driver
+Charging Station CSMS
+A transaction is ongoing.
+unplug charging cable
+stop energy offer
+TransactionEventRequest(eventType = Ended, chargingState = idle,
+triggerReason = EVCommunicationLost, stoppedReason = EVDisconnected)
+TransactionEventResponse()
+Figure 51. Sequence Diagram: Stop Transaction options - EVConnected
+S3 Scenario objective Stop a transaction when the driver is no longer authorized.
+Scenario description 1. The Charging Station sends a TransactionEventRequest to the CSMS. 2. An invalid IdToken is
+received in a TransactionEventResponse.
+3. The Charging Station sends a TransactionEventRequest (eventType = Ended) notifying the
+CSMS about a transaction that has ended.
+4. The CSMS responds with a TransactionEventResponse, confirming that the
+TransactionEventRequest was received.
+Prerequisite(s) A transaction is ongoing.
+Configuration Variable: TxStopPoint contains: Authorized
+Postcondition(s) Successful postcondition:
+The transaction is ended and the CSMS is Successfully informed.
+Failure postcondition:
+The transaction is still ongoing. or
+The CSMS is not informed.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 143/471 Part 2 - Specification
+Charging Station CSMS
+TxStopPoint
+contains "Authorized".
+User locally authorized by the Charging Station
+TransactionEventRequest(...)
+TransactionEventResponse(idTokenInfo.status != Accepted, ...)
+stop energy offer
+alt [If StopTxOnInvalidId is true]
+TransactionEventRequest(eventType = Ended,
+triggerReason = Deauthorized, stoppedReason = DeAuthorized, ...)
+TransactionEventResponse(...)
+[If StopTxOnInvalidId is false]
+TransactionEventRequest(eventType = Updated,
+triggerReason = ChargingStateChanged, ...)
+TransactionEventResponse(...)
+Figure 52. Sequence Diagram: Stop Transaction options - Deauthorized
+S5 Scenario objective Stop a transaction when the EV driver is no longer authorized and/or the EV is disconnected.
+Scenario description 1. The Charging Station is disconnected from EV and/or the EV driver is no longer authorized.
+2. The Charging Station sends a TransactionEventRequest (eventType = Ended) notifying the
+CSMS about a transaction that has ended.
+3. The CSMS responds with a TransactionEventResponse, confirming that the
+TransactionEventRequest was received.
+Prerequisite(s) A transaction is ongoing.
+Configuration Variable: TxStopPoint contains: PowerPathClosed
+Postcondition(s) Successful postcondition:
+The transaction is ended and the CSMS is Successfully informed.
+Failure postcondition:
+The transaction is still ongoing. or
+The CSMS is not informed.
+Charging Station CSMS
+A transaction is ongoing.
+TransactionEventRequest(eventType = Ended, chargingState = EVConnected, ...)
+TransactionEventResponse()
+Figure 53. Sequence Diagram: Stop Transaction options - PowerPathClosed
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 144/471 Part 2 - Specification
+S6 Scenario objective Stop a transaction when energy transfer stops. This will also mean the transaction stops when
+the EV stops taking energy, for example when the battery is to hot.
+Scenario description 1. The energy transfer between EV and the Charging Station stops (for example: EV stops
+charging).
+2. The Charging Station sends a TransactionEventRequest (eventType = Ended) notifying the
+CSMS about a transaction that has ended.
+3. The CSMS responds with a TransactionEventResponse, confirming that the
+TransactionEventRequest was received.
+Prerequisite(s) A transaction is ongoing.
+Configuration Variable: TxStopPoint contains: EnergyTransfer
+Postcondition(s) Successful postcondition:
+The transaction is ended and the CSMS is Successfully informed.
+Failure postcondition:
+The transaction is still ongoing. or
+The CSMS is not informed.
+EV
+Charging Station CSMS
+A transaction is ongoing.
+energy transfer stopped
+stop energy offer
+TransactionEventRequest(eventType = Ended, ...)
+TransactionEventResponse()
+Figure 54. Sequence Diagram: Stop Transaction options - EnergyTransfer
+S7 Scenario objective Stop a transaction when EV driver ends authorization
+Scenario description 1. The EV drivers presents an IdToken to end the charging.
+2. The Charging Station sends a TransactionEventRequest (eventType = Ended) notifying the
+CSMS about a transaction that has ended.
+3. The CSMS responds with a TransactionEventResponse, confirming that the
+TransactionEventRequest was received.
+Prerequisite(s) A transaction is ongoing.
+Configuration Variable: TxStopPoint contains: Authorized (or PowerPathClosed).
+Postcondition(s) Successful postcondition:
+The transaction is ended and the CSMS is Successfully informed.
+Failure postcondition:
+The transaction is still ongoing. or
+The CSMS is not informed.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 145/471 Part 2 - Specification
+EV DriverCharging Station CSMS
+User authorization successful.
+opt[if cable not permanently attached & (same identification or authorized)]
+unlock connector
+TransactionEventRequest(eventType = Ended, transactionId = AB1234, seqNo = N + 1, timestamp,chargingState = EVConnected, triggerReason = StopAuthorized, idToken.id = 1234, stoppedReason = Local)
+TransactionEventResponse(idTokenInfo.status = Accepted / Blocked / Invalid / Expired)
+Figure 55. Sequence Diagram: Stop Transaction options - Authorized
+7 Error handling n/a
+8 Remark(s) n/a
+E06 - Stop Transaction options - Requirements
+Table 107. E06 - Requirements
+ID Precondition Requirement definition
+E06.FR.01 TxStopPoint contains:
+ParkingBayOccupancy
+AND
+Parking Bay Detector no longer detects the
+"EV"
+The Charging Station SHALL stop the transaction and send a
+TransactionEventRequest (eventType = Ended) to the CSMS.
+E06.FR.02 TxStopPoint contains: EVConnected
+AND
+Connection between Charging Station and
+EV is lost.
+The Charging Station SHALL stop the transaction and send a
+TransactionEventRequest (eventType = Ended) to the CSMS.
+E06.FR.03 TxStopPoint contains: Authorized
+AND
+EV Driver is authorized to stop a
+transaction.
+The Charging Station SHALL stop the transaction and send a
+TransactionEventRequest (eventType = Ended) to the CSMS.
+E06.FR.04 TxStopPoint contains: Authorized
+AND
+CSMS returns a non-valid idTokenInfo in a
+TransactionEventResponse
+The Charging Station SHALL stop the transaction and send a
+TransactionEventRequest (eventType = Ended) to the CSMS.
+E06.FR.05 TxStopPoint contains: DataSigned
+AND
+Charging Station can no longer retrieve
+signed meter values.
+The Charging Station SHALL stop the transaction and send a
+TransactionEventRequest (eventType = Ended) to the CSMS.
+E06.FR.06 TxStopPoint contains:
+PowerPathClosed
+AND (
+Connection between Charging Station and
+EV is lost
+OR
+Authorization has ended or idToken is
+deauthorized )
+The Charging Station SHALL stop the transaction and send a
+TransactionEventRequest (eventType = Ended) to the CSMS.
+E06.FR.07 TxStopPoint contains: EnergyTransfer
+AND
+Energy transfer stops
+The Charging Station SHALL stop the transaction and send a
+TransactionEventRequest (eventType = Ended) to the CSMS.
+E06.FR.08 If a transaction is not ended by the EV
+Driver at the Charging Station
+The Charging Station SHALL include the stoppedReason element in the
+TransactionEventRequest(eventType = Ended). What reason to use is
+described in the description of reasonEnumType.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 146/471 Part 2 - Specification
+ID Precondition Requirement definition
+E06.FR.09 If a transaction is ended by the EV Driver at
+the Charging Station (e.g. EV Driver
+presented IdToken to stop the transaction)
+The Charging Station MAY omit the stoppedReason element in the
+TransactionEventRequest (eventType = Ended) (hence the CSMS can
+interpret the reason as local when omitted).
+E06.FR.10 As part of the normal transaction
+termination.
+The Charging Station SHALL unlock the cable (if not permanently attached).
+E06.FR.11 When configured to send meter data in the
+TransactionEventRequest (eventType =
+Ended), See: Meter Values - Configuration
+The Charging Station SHALL add the configured measurands to the
+optional meterValue field with context = Transaction.End in the
+TransactionEventRequest(eventType = Ended) sent to the CSMS to provide
+more details about transaction usage.
+E06.FR.12 E06.FR.11
+AND
+The Charging Station is running low on
+memory
+The Charging Station MAY drop meter data in the
+TransactionEventRequest(eventType = Ended) message.
+E06.FR.13 E06.FR.12 When dropping meter data, the Charging Station SHALL drop intermediate
+values first (1st value, 3th value, 5th etc), not start dropping values from the
+start of the list or stop adding values to the list.
+E06.FR.14 When a TransactionEventRequest has to
+be created
+The Charging Station SHALL set the message’s seqNo field as specified in
+Sequence Number Generation.
+E06.FR.15 When sending a TransactionEventRequest The Charging Station SHALL set the triggerReason to inform the CSMS
+about what triggered the event. What reason to use is described in the
+description of TriggerReasonEnumType.
+E06.FR.16 A transaction was stopped by an
+Abnormal Error or Fault Condition.
+The Charging Station SHALL send TransactionEventRequest(eventType =
+Ended, triggerReason=AbnormalCondition)_ to the CSMS.
+E06 - Stop Transaction options
+E06 - Stop Transaction options
+E06 - Stop Transaction options
+E06 - Stop Transaction options
+Source: ISO15118-1

@@ -1,0 +1,207 @@
+B06 - Get Variables - Test Cases
+
+GOAL: Allow the CSMS to retrieve the value of one or more variables from one or more components on a Charging Station.
+
+================================================================================
+
+TEST CASE 1: Request a single variable successfully
+Scenario: CSMS requests the value of one known variable from a known component.
+Steps:
+  1. CSMS sends a GetVariablesRequest with one GetVariableData element (valid component and variable).
+  2. Charging Station processes the request.
+  3. Charging Station sends a GetVariablesResponse with one GetVariableResult element.
+Expected result:
+  - Response contains exactly one GetVariableResult.
+  - attributeStatus is "Accepted".
+  - attributeValue contains the current value of the requested variable.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 2: Request multiple variables in one call
+Scenario: CSMS requests values for multiple variables (within the allowed limit).
+Steps:
+  1. CSMS sends a GetVariablesRequest with X GetVariableData elements (all valid).
+  2. Charging Station processes all entries.
+  3. Charging Station sends a GetVariablesResponse.
+Expected result:
+  - Response contains exactly X GetVariableResult elements.
+  - Each result corresponds to one of the requested GetVariableData elements (same component/variable).
+  - All statuses are "Accepted" with appropriate values.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 3: Response mirrors the component and variable from the request
+Scenario: Verify that each GetVariableResult references the same component/variable as the request.
+Steps:
+  1. CSMS sends a GetVariablesRequest with multiple different component/variable combinations.
+  2. Charging Station responds with GetVariablesResponse.
+Expected result:
+  - Each GetVariableResult contains the same component and variable combination as the corresponding GetVariableData element.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 4: Request includes an attributeType — response must echo it
+Scenario: CSMS specifies an attributeType (e.g., "Target") in the request.
+Steps:
+  1. CSMS sends GetVariablesRequest with a GetVariableData that includes an attributeType.
+  2. Charging Station responds.
+Expected result:
+  - The corresponding GetVariableResult includes the same attributeType as requested.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 5: Request without attributeType — defaults to "Actual"
+Scenario: CSMS omits the attributeType field in the request.
+Steps:
+  1. CSMS sends GetVariablesRequest without specifying attributeType.
+  2. Charging Station responds.
+Expected result:
+  - The GetVariableResult contains attributeType "Actual".
+
+--------------------------------------------------------------------------------
+
+TEST CASE 6: Unknown Component
+Scenario: CSMS requests a variable for a component that does not exist on the Charging Station.
+Steps:
+  1. CSMS sends GetVariablesRequest with a GetVariableData referencing a non-existent component.
+  2. Charging Station processes the request.
+Expected result:
+  - The corresponding GetVariableResult has attributeStatus set to "UnknownComponent".
+  - attributeValue is omitted (not present in the response).
+
+--------------------------------------------------------------------------------
+
+TEST CASE 7: Unknown Variable for a known Component
+Scenario: CSMS requests a variable that does not exist for an otherwise valid component.
+Steps:
+  1. CSMS sends GetVariablesRequest with a GetVariableData for a valid component but unknown variable.
+  2. Charging Station processes the request.
+Expected result:
+  - The corresponding GetVariableResult has attributeStatus set to "UnknownVariable".
+  - attributeValue is omitted.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 8: Unsupported attributeType for the variable
+Scenario: CSMS requests an attributeType that is not supported for the given variable.
+Steps:
+  1. CSMS sends GetVariablesRequest specifying an attributeType not supported by that variable.
+  2. Charging Station processes the request.
+Expected result:
+  - The corresponding GetVariableResult has attributeStatus set to "NotSupportedAttributeType".
+  - attributeValue is omitted.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 9: WriteOnly variable requested
+Scenario: CSMS requests the value of a variable that is marked as write-only.
+Steps:
+  1. CSMS sends GetVariablesRequest for a variable that is WriteOnly.
+  2. Charging Station processes the request.
+Expected result:
+  - The corresponding GetVariableResult has attributeStatus set to "Rejected".
+
+--------------------------------------------------------------------------------
+
+TEST CASE 10: Variable exists but has no value set (empty attributeValue)
+Scenario: The requested variable/attributeType is supported but has no value configured yet (e.g., "Target" not yet set).
+Steps:
+  1. CSMS sends GetVariablesRequest for a valid component/variable with a supported attributeType that has no value.
+  2. Charging Station processes the request.
+Expected result:
+  - attributeStatus is "Accepted".
+  - attributeValue is an empty string ("").
+
+--------------------------------------------------------------------------------
+
+TEST CASE 11: Request exactly at the ItemsPerMessageGetVariables limit
+Scenario: CSMS sends a request with the maximum allowed number of GetVariableData elements.
+Steps:
+  1. CSMS checks the Charging Station's reported ItemsPerMessageGetVariables limit.
+  2. CSMS sends a GetVariablesRequest with exactly that number of GetVariableData elements.
+  3. Charging Station processes the request.
+Expected result:
+  - Charging Station responds with a valid GetVariablesResponse containing the matching number of results.
+  - No error is returned.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 12: Request exceeds ItemsPerMessageGetVariables limit
+Scenario: CSMS attempts to request more variables than the Charging Station allows per message.
+Steps:
+  1. CSMS sends a GetVariablesRequest with more GetVariableData elements than allowed by ItemsPerMessageGetVariables.
+  2. Charging Station processes the request.
+Expected result:
+  - Charging Station MAY respond with a CALLERROR indicating OccurenceConstraintViolation.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 13: Message size exceeds BytesPerMessageGetVariables limit
+Scenario: The GetVariablesRequest message is larger in bytes than the Charging Station allows.
+Steps:
+  1. CSMS sends a GetVariablesRequest whose total byte size exceeds BytesPerMessageGetVariables.
+  2. Charging Station processes the request.
+Expected result:
+  - Charging Station MAY respond with a CALLERROR indicating FormatViolation.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 14: Request with a specific instance for a component
+Scenario: CSMS requests a variable for a specific instance of a component (e.g., Connector instance 2).
+Steps:
+  1. CSMS sends GetVariablesRequest with a GetVariableData that includes an instance value for the component or variable.
+  2. Charging Station processes the request.
+Expected result:
+  - The GetVariableResult returns data for that specific instance.
+  - attributeStatus is "Accepted" if the instance exists.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 15: Request with no instance or empty instance — no non-instance component exists
+Scenario: CSMS omits or provides an empty instance value, but the Charging Station only has instanced versions of that component/variable.
+Steps:
+  1. CSMS sends GetVariablesRequest without specifying an instance (or with an empty string) for a component/variable that requires an instance.
+  2. Charging Station processes the request.
+Expected result:
+  - The GetVariableResult has attributeStatus set to "UnknownComponent" or "UnknownVariable" as appropriate.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 16: Mixed request — some valid, some invalid entries
+Scenario: CSMS sends a GetVariablesRequest with a mix of valid and invalid variable references.
+Steps:
+  1. CSMS sends GetVariablesRequest with 3 GetVariableData elements:
+     - One valid component/variable.
+     - One unknown component.
+     - One write-only variable.
+  2. Charging Station processes all entries and responds.
+Expected result:
+  - Response contains 3 GetVariableResult elements.
+  - Valid entry: attributeStatus "Accepted" with a value.
+  - Unknown component: attributeStatus "UnknownComponent", no value.
+  - Write-only variable: attributeStatus "Rejected".
+
+--------------------------------------------------------------------------------
+
+TEST CASE 17: CSMS receives the response and optionally notifies the CSO
+Scenario: After receiving the GetVariablesResponse, the CSMS may send a notification to the CSO.
+Steps:
+  1. CSMS sends GetVariablesRequest.
+  2. Charging Station responds with GetVariablesResponse.
+  3. CSMS optionally sends a notification to the CSO.
+Expected result:
+  - The notification (if sent) reflects the results received from the Charging Station.
+  - This step is optional and its absence does not constitute a failure.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 18: Verify CSMS does not exceed ItemsPerMessageGetVariables
+Scenario: CSMS must not send more items than the Charging Station reported as its limit.
+Steps:
+  1. Confirm the Charging Station has reported ItemsPerMessageGetVariables (e.g., via a prior GetVariables or provisioning).
+  2. Attempt to construct a GetVariablesRequest with one more item than allowed.
+  3. Verify the CSMS does not send this request.
+Expected result:
+  - The CSMS prevents sending the oversized request, respecting the reported limit.
+
+--------------------------------------------------------------------------------

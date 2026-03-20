@@ -1,0 +1,122 @@
+C10 - Store Authorization Data in the Authorization Cache and C10 - Store Authorization Data in the Authorization Cache
+Table 77. C10 - Store Authorization Data in Authorization Cache
+No. Type Description
+1 Name Store Authorization Data in the Authorization Cache
+2 ID C10
+Functional block C. Authorization
+3 Objective(s) To store all the latest received IdTokens in the Authorization Cache.
+4 Description This use case covers how the Charging Station autonomously stores a record of previously
+presented identifiers that have been successfully authorized by the CSMS in the Authorization
+Cache. (Successfully meaning: a response received on a message containing an IdToken)
+Actors Charging Station, CSMS
+Scenario description 1. The Charging Station receives a AuthorizeResponse, ReserveNowRequest or
+TransactionEventResponse response message from the CSMS.
+2. The Cache is updated by the Charging Station using all received IdTokenInfo from the response
+message from the CSMS.
+Alternative scenario(s) n/a
+5 Prerequisite(s) An Authorization Cache is implemented and and the value of the AuthCacheEnabled
+Configuration Variable is set to 'true'.
+6 Postcondition(s) Successful postcondition:
+The Charging Station stored the newly received IdTokenInfo data in the Authorization Cache.
+Failure postcondition:
+The Charging Station was not able to store the Authorization Cache.
+Charging StationCSMS
+alt[for AuthorizeResponse]
+AuthorizeRequest(...)
+AuthorizeResponse(idTokenInfo,...)
+Store Authorization Data in
+Authorization Cache()
+[for TransactionEventResponse]
+TransactionEventRequest(...)
+TransactionEventResponse(idTokenInfo,...)
+Store Authorization Data in
+Authorization Cache()
+[for ReserveNowRequest]
+ReserveNowRequest(idToken,...)
+ReserveNowResponse(...)
+Store Authorization Data in
+Authorization Cache()
+Figure 31. Sequence Diagram: Store Authorization Data in the Authorization Cache
+7 Error handling n/a
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 96/471 Part 2 - Specification
+8 Remark(s) n/a
+C10 - Store Authorization Data in the Authorization Cache - Requirements
+Table 78. C10 - Requirements
+ID Precondition Requirement definition Note
+C10.FR.01 The Authorization Cache SHALL contain all the
+latest received identifiers (regardless of their
+status).
+C10.FR.02 Cache values SHOULD be persistent across reboots
+and power outages.
+Hence cache values
+SHOULD be stored in
+non-volatile memory.
+C10.FR.03 When an IdToken is presented that is
+stored in the Authorization Cache with
+status other than Accepted, and the
+Charging Station is online.
+AuthorizeRequest SHALL be sent to the CSMS to
+check the current state of the IdToken.
+To check the current
+state of the identifier.
+C10.FR.04 Upon receipt of AuthorizeResponse. The Charging Station SHALL update the
+Authorisation Cache entry.
+The update is to be done
+with the IdTokenInfo
+value from the response
+as described under
+Authorization Cache.
+C10.FR.05 Upon receipt of
+TransactionEventResponse.
+The Charging Station SHALL update the
+Authorisation Cache entry.
+The update is to be done
+with the IdTokenInfo
+value from the response
+as described under
+Authorization Cache.
+C10.FR.06 Upon receipt of ReserveNowRequest. The Charging Station SHALL update the
+Authorisation Cache entry.
+The update is to be done
+with the IdTokenInfo
+value from the request as
+described under
+Authorization Cache.
+C10.FR.07 The Charging Station SHALL have a mechanism to
+accept new cache entries even when it is full, by
+deleting older entries.
+It is suggested to remove
+any entries with status
+other than Accepted first,
+and then the oldest valid
+entries to make space for
+the new entry.
+C10.FR.08 The time a token may live in the cache is
+determined by the Configuration Variable
+AuthCacheLifeTime. This variable indicates how
+long it takes until a token expires in the
+Authorization Cache since it is last used.
+This expiry of the cache
+is not the same as the
+expiration date that is set
+for the IdToken (e.g. RFID
+card expiry date).
+C10.FR.09 The Charging Station supports Tariff &
+Cost
+The Charging Station SHALL NOT store the tariff
+information in the Cache.
+C10.FR.10 When the validity of an Authorization
+Cache entry expires.
+The Authorization Cache entry SHALL be removed
+from the cache or changed to Expired.
+C10.FR.11 Whether the Authorization Cache is enabled or
+disabled SHALL be controlled by the
+AuthCacheEnabled Configuration Variable.
+C10.FR.12 It is RECOMMENDED to store personal information
+in the Authorization Cache securely
+E.g. by only storing
+hashed idTokens in the
+cache.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 97/471 Part 2 - Specification

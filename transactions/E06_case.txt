@@ -1,0 +1,322 @@
+E06 - Stop Transaction options
+Test Cases
+================================================================================
+
+TC-E06-001
+Title: Stop transaction when parking bay occupancy detector no longer detects EV
+Requirement: E06.FR.01
+Steps:
+  1. Ensure a transaction is ongoing at the Charging Station.
+  2. Configure TxStopPoint to contain: ParkingBayOccupancy.
+  3. Cause the parking bay occupancy detector to stop detecting the EV (EV departs from bay).
+Expected Result:
+  The Charging Station stops the transaction.
+  The Charging Station sends a TransactionEventRequest to the CSMS with eventType = Ended
+  and triggerReason = EVDeparted and stoppedReason = Local.
+  The CSMS responds with a TransactionEventResponse confirming receipt.
+  The transaction is no longer active on the Charging Station.
+
+--------------------------------------------------------------------------------
+
+TC-E06-002
+Title: Stop transaction when EV connection is lost (EVConnected stop point)
+Requirement: E06.FR.02
+Steps:
+  1. Ensure a transaction is ongoing at the Charging Station.
+  2. Configure TxStopPoint to contain: EVConnected.
+  3. Unplug the charging cable, severing communication between the Charging Station and the EV.
+  4. If the cable was unplugged on the Charging Station side, observe whether a StatusNotificationRequest is sent to the CSMS indicating the connector is Available.
+Expected Result:
+  The Charging Station stops the transaction.
+  The Charging Station sends a TransactionEventRequest to the CSMS with eventType = Ended,
+  chargingState = idle, triggerReason = EVCommunicationLost, and stoppedReason = EVDisconnected.
+  The CSMS responds with a TransactionEventResponse confirming receipt.
+  If the cable was unplugged on the Charging Station side, a StatusNotificationRequest indicating
+  the connector is Available is sent before or alongside the TransactionEventRequest.
+  The transaction is no longer active on the Charging Station.
+
+--------------------------------------------------------------------------------
+
+TC-E06-003
+Title: Stop transaction when EV driver presents valid IdToken to stop charging (driver-authorized stop)
+Requirement: E06.FR.03
+Steps:
+  1. Ensure a transaction is ongoing at the Charging Station.
+  2. Configure TxStopPoint to contain: Authorized.
+  3. The EV driver presents a valid IdToken at the Charging Station to authorize stopping the transaction.
+Expected Result:
+  The Charging Station determines the EV driver is authorized to stop the transaction.
+  The Charging Station stops the transaction.
+  The Charging Station sends a TransactionEventRequest to the CSMS with eventType = Ended
+  and triggerReason = StopAuthorized.
+  The TransactionEventRequest includes the idToken used to stop (e.g., idToken.id = the presented token)
+  and stoppedReason = Local (or stoppedReason may be omitted per E06.FR.09).
+  The CSMS responds with a TransactionEventResponse.
+  The transaction is no longer active on the Charging Station.
+
+--------------------------------------------------------------------------------
+
+TC-E06-004
+Title: Stop transaction when CSMS returns non-valid idTokenInfo in TransactionEventResponse (StopTxOnInvalidId = true)
+Requirement: E06.FR.04
+Steps:
+  1. Ensure a transaction is ongoing at the Charging Station.
+  2. Configure TxStopPoint to contain: Authorized.
+  3. Configure StopTxOnInvalidId = true on the Charging Station.
+  4. The Charging Station sends a TransactionEventRequest to the CSMS during the transaction.
+  5. The CSMS responds with a TransactionEventResponse containing idTokenInfo.status with a value
+     other than Accepted (e.g., Blocked, Invalid, or Expired).
+Expected Result:
+  The Charging Station stops the energy offer immediately upon receiving the non-valid idTokenInfo.
+  The Charging Station sends a TransactionEventRequest to the CSMS with eventType = Ended,
+  triggerReason = Deauthorized, and stoppedReason = DeAuthorized.
+  The CSMS responds with a TransactionEventResponse.
+  The transaction is no longer active on the Charging Station.
+
+--------------------------------------------------------------------------------
+
+TC-E06-004b
+Title: Updated transaction state (not ended) when CSMS returns non-valid idTokenInfo and StopTxOnInvalidId = false
+Requirement: E06.FR.04
+Steps:
+  1. Ensure a transaction is ongoing at the Charging Station.
+  2. Configure TxStopPoint to contain: Authorized.
+  3. Configure StopTxOnInvalidId = false on the Charging Station.
+  4. The Charging Station sends a TransactionEventRequest to the CSMS during the transaction.
+  5. The CSMS responds with a TransactionEventResponse containing idTokenInfo.status with a value
+     other than Accepted (e.g., Blocked, Invalid, or Expired).
+Expected Result:
+  The Charging Station stops the energy offer.
+  The Charging Station sends a TransactionEventRequest to the CSMS with eventType = Updated
+  and triggerReason = ChargingStateChanged (transaction is NOT ended in this branch).
+  The CSMS responds with a TransactionEventResponse.
+  The transaction remains active (not ended) on the Charging Station.
+
+--------------------------------------------------------------------------------
+
+TC-E06-005
+Title: Stop transaction when signed meter values can no longer be retrieved (DataSigned stop point)
+Requirement: E06.FR.05
+Steps:
+  1. Ensure a transaction is ongoing at the Charging Station.
+  2. Configure TxStopPoint to contain: DataSigned.
+  3. Simulate or trigger a condition where the Charging Station can no longer retrieve signed meter values.
+Expected Result:
+  The Charging Station stops the transaction.
+  The Charging Station sends a TransactionEventRequest to the CSMS with eventType = Ended.
+  The CSMS responds with a TransactionEventResponse confirming receipt.
+  The transaction is no longer active on the Charging Station.
+
+--------------------------------------------------------------------------------
+
+TC-E06-006
+Title: Stop transaction when PowerPathClosed and EV connection is lost
+Requirement: E06.FR.06
+Steps:
+  1. Ensure a transaction is ongoing at the Charging Station.
+  2. Configure TxStopPoint to contain: PowerPathClosed.
+  3. Sever the connection between the Charging Station and the EV (e.g., unplug the cable).
+Expected Result:
+  The Charging Station stops the transaction.
+  The Charging Station sends a TransactionEventRequest to the CSMS with eventType = Ended
+  and chargingState = EVConnected (as shown in S5 sequence diagram).
+  The CSMS responds with a TransactionEventResponse confirming receipt.
+  The transaction is no longer active on the Charging Station.
+
+--------------------------------------------------------------------------------
+
+TC-E06-006b
+Title: Stop transaction when PowerPathClosed and authorization has ended or idToken is deauthorized
+Requirement: E06.FR.06
+Steps:
+  1. Ensure a transaction is ongoing at the Charging Station.
+  2. Configure TxStopPoint to contain: PowerPathClosed.
+  3. Trigger a condition where authorization has ended or the idToken is deauthorized
+     (e.g., CSMS deauthorizes the token mid-transaction).
+Expected Result:
+  The Charging Station stops the transaction.
+  The Charging Station sends a TransactionEventRequest to the CSMS with eventType = Ended.
+  The CSMS responds with a TransactionEventResponse confirming receipt.
+  The transaction is no longer active on the Charging Station.
+
+--------------------------------------------------------------------------------
+
+TC-E06-007
+Title: Stop transaction when energy transfer stops (EnergyTransfer stop point)
+Requirement: E06.FR.07
+Steps:
+  1. Ensure a transaction is ongoing at the Charging Station.
+  2. Configure TxStopPoint to contain: EnergyTransfer.
+  3. Cause the energy transfer between the EV and the Charging Station to stop
+     (e.g., EV battery reaches full charge or EV internally halts charging).
+Expected Result:
+  The Charging Station detects that energy transfer has stopped.
+  The Charging Station stops the transaction.
+  The Charging Station sends a TransactionEventRequest to the CSMS with eventType = Ended.
+  The CSMS responds with a TransactionEventResponse confirming receipt.
+  The transaction is no longer active on the Charging Station.
+
+--------------------------------------------------------------------------------
+
+TC-E06-008
+Title: stoppedReason is included when transaction is not ended by the EV driver locally
+Requirement: E06.FR.08
+Steps:
+  1. Ensure a transaction is ongoing at the Charging Station.
+  2. Trigger a stop condition that is NOT caused by the EV driver presenting an IdToken locally
+     (e.g., EVCommunicationLost, EVDeparted, AbnormalCondition, or deauthorization from CSMS).
+  3. Observe the TransactionEventRequest (eventType = Ended) sent by the Charging Station.
+Expected Result:
+  The TransactionEventRequest (eventType = Ended) includes the stoppedReason field.
+  The stoppedReason value is set to the appropriate reason for the stop condition
+  as described in reasonEnumType (e.g., EVDisconnected, Local, DeAuthorized, etc.).
+  The stoppedReason field is not omitted or empty.
+
+--------------------------------------------------------------------------------
+
+TC-E06-009
+Title: stoppedReason may be omitted when transaction is ended by EV driver locally
+Requirement: E06.FR.09
+Steps:
+  1. Ensure a transaction is ongoing at the Charging Station.
+  2. The EV driver presents an IdToken at the Charging Station to stop the transaction locally.
+  3. Observe the TransactionEventRequest (eventType = Ended) sent by the Charging Station.
+Expected Result:
+  The Charging Station sends a TransactionEventRequest with eventType = Ended.
+  The stoppedReason field MAY be omitted from the TransactionEventRequest.
+  If the stoppedReason field is omitted, the CSMS interprets the reason as Local.
+  If the stoppedReason field is present, it is set to Local.
+  The CSMS responds with a TransactionEventResponse.
+
+--------------------------------------------------------------------------------
+
+TC-E06-010
+Title: Charging cable is unlocked upon normal transaction termination
+Requirement: E06.FR.10
+Steps:
+  1. Ensure a transaction is ongoing at the Charging Station with a non-permanently-attached cable.
+  2. End the transaction through any normal termination path (e.g., EV driver presents IdToken to stop).
+  3. Observe the behavior of the cable lock mechanism on the Charging Station.
+Expected Result:
+  Upon normal transaction termination, the Charging Station unlocks the cable.
+  The connector lock is released, allowing the cable to be physically unplugged.
+  This unlock action is reflected in the sequence (e.g., as shown in S7, "unlock connector" step
+  occurs after user authorization is successful and before or alongside the TransactionEventRequest).
+
+--------------------------------------------------------------------------------
+
+TC-E06-011
+Title: Configured meter measurands are added to TransactionEventRequest (eventType = Ended)
+Requirement: E06.FR.11
+Steps:
+  1. Configure the Charging Station to send meter data in the TransactionEventRequest
+     (eventType = Ended) with specific measurands as per Meter Values configuration.
+  2. Ensure a transaction is ongoing and then trigger a normal transaction stop.
+  3. Observe the TransactionEventRequest (eventType = Ended) sent to the CSMS.
+Expected Result:
+  The TransactionEventRequest (eventType = Ended) includes the optional meterValue field.
+  The meterValue field contains the configured measurands.
+  Each measurand entry in meterValue has context = Transaction.End.
+  The CSMS receives the meter data as part of the TransactionEventRequest.
+
+--------------------------------------------------------------------------------
+
+TC-E06-012
+Title: Meter data may be dropped when Charging Station is low on memory
+Requirement: E06.FR.12
+Steps:
+  1. Configure the Charging Station to send meter data in the TransactionEventRequest
+     (eventType = Ended) per E06.FR.11.
+  2. Simulate a low-memory condition on the Charging Station.
+  3. Trigger a normal transaction stop.
+  4. Observe the TransactionEventRequest (eventType = Ended) sent to the CSMS.
+Expected Result:
+  The Charging Station MAY drop meter data from the meterValue field in the
+  TransactionEventRequest (eventType = Ended) due to low memory.
+  The TransactionEventRequest is still sent with eventType = Ended.
+  If meter data is dropped, the remaining meter values still conform to E06.FR.13
+  (intermediate values are dropped first).
+
+--------------------------------------------------------------------------------
+
+TC-E06-013
+Title: When dropping meter data, intermediate values are dropped first (not from start or end)
+Requirement: E06.FR.13
+Steps:
+  1. Configure the Charging Station to send meter data in the TransactionEventRequest
+     (eventType = Ended) with multiple meter value samples collected during the transaction.
+  2. Simulate a low-memory condition such that the Charging Station must drop some meter values.
+  3. Trigger a normal transaction stop.
+  4. Observe the meterValue list in the TransactionEventRequest (eventType = Ended).
+Expected Result:
+  The Charging Station drops intermediate meter values first (i.e., odd-indexed intermediate
+  values such as the 1st, 3rd, 5th values in the sequence are removed first).
+  The Charging Station does NOT drop values from the start of the list (i.e., the first recorded
+  value is preserved as long as possible).
+  The Charging Station does NOT stop adding new values to the end of the list (i.e., the final
+  recorded value is preserved as long as possible).
+  The remaining meter values in the TransactionEventRequest reflect this dropping strategy.
+
+--------------------------------------------------------------------------------
+
+TC-E06-014
+Title: seqNo field is correctly set in TransactionEventRequest
+Requirement: E06.FR.14
+Steps:
+  1. Ensure a transaction is ongoing with at least one prior TransactionEventRequest already sent
+     (establishing an existing seqNo sequence for this transaction).
+  2. Trigger a stop condition so that a TransactionEventRequest (eventType = Ended) must be created.
+  3. Observe the seqNo field in the TransactionEventRequest (eventType = Ended).
+Expected Result:
+  The TransactionEventRequest (eventType = Ended) contains a seqNo field.
+  The seqNo value is set according to the Sequence Number Generation rules (i.e., it is one
+  greater than the previous seqNo sent for the same transaction, e.g., seqNo = N + 1 where N
+  was the seqNo of the last TransactionEventRequest for this transaction).
+  The seqNo is not repeated or out of order relative to previous messages in the same transaction.
+
+--------------------------------------------------------------------------------
+
+TC-E06-015
+Title: triggerReason field is set in every TransactionEventRequest
+Requirement: E06.FR.15
+Steps:
+  1. Trigger a transaction stop via each of the supported stop conditions in turn:
+     a. Parking bay occupancy detector no longer detects the EV.
+     b. EV communication is lost (cable unplugged).
+     c. EV driver presents IdToken to stop transaction.
+     d. CSMS returns non-valid idTokenInfo.
+     e. Energy transfer stops.
+     f. Abnormal error or fault condition.
+  2. For each stop condition, observe the TransactionEventRequest sent to the CSMS.
+Expected Result:
+  Every TransactionEventRequest sent by the Charging Station includes the triggerReason field.
+  The triggerReason value corresponds to the actual cause of the event as described in
+  TriggerReasonEnumType:
+    - EVDeparted when the parking bay detector no longer detects the EV (S1).
+    - EVCommunicationLost when the cable is unplugged (S2).
+    - StopAuthorized when the EV driver presents an IdToken to stop (S7).
+    - Deauthorized when the CSMS returns a non-valid idTokenInfo and StopTxOnInvalidId = true (S3).
+    - AbnormalCondition when an abnormal error or fault condition triggers the stop (FR.16).
+  The field is never absent from any TransactionEventRequest.
+
+--------------------------------------------------------------------------------
+
+TC-E06-016
+Title: Transaction stopped by abnormal error or fault sends AbnormalCondition triggerReason
+Requirement: E06.FR.16
+Steps:
+  1. Ensure a transaction is ongoing at the Charging Station.
+  2. Introduce or simulate an abnormal error or fault condition at the Charging Station
+     (e.g., an internal fault that forces the transaction to terminate).
+  3. Observe the TransactionEventRequest sent by the Charging Station to the CSMS.
+Expected Result:
+  The Charging Station sends a TransactionEventRequest with eventType = Ended
+  and triggerReason = AbnormalCondition.
+  The CSMS receives this message and responds with a TransactionEventResponse.
+  The transaction is no longer active on the Charging Station.
+  The stoppedReason field is included in the TransactionEventRequest (per E06.FR.08,
+  since the transaction was not ended by the EV driver locally).
+
+================================================================================
+END OF TEST CASES
+================================================================================

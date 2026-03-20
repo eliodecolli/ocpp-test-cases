@@ -1,0 +1,88 @@
+G04 - Change Availability Charging Station
+5 Prerequisite(s) n/a
+6 Postcondition(s) Successful postcondition:
+When changing the availability of an EVSE/Connector to Operative, the status of the EVSE has
+changed to Available, Occupied or Reserved.
+When changing the availability of an EVSE/Connector to Inoperative , the status of the EVSE has
+changed to Unavailable.
+Failure postcondition:
+The status of the EVSE is as it was just before the Charging Station received
+ChangeAvailabilityRequest and not according to the requested Availability.
+Charging Station CSMS
+ChangeAvailabilityRequest(EVSE.id, type)
+ChangeAvailabilityResponse(status)
+alt[if availability changed]
+alt[if a transaction is ongoing]
+Wait for transaction on EVSE to finish.
+loop[for all Connectors of the specified EVSE]
+StatusNotificationRequest(evseId, connectorId, connectorStatus, [timestamp])
+StatusNotificationResponse()
+Figure 76. Sequence Diagram: Change Availability
+7 Error handling n/a
+8 Remark(s) Persistent states, for example:
+EVSE set to Available SHALL persist a reboot.
+Edition 2 FINAL, 2022-12-15 G. Availability
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 195/471 Part 2 - Specification
+G04 - Change Availability Charging Station
+Table 142. G04 - Change Availability Charging Station
+No. Type Description
+1 Name Change Availability Charging Station
+2 ID G04
+Functional block G. Availability
+Parent use case G04 - Change Availability Charging Station - Requirements
+Table 143. G04 - Requirements
+Edition 2 FINAL, 2022-12-15 G. Availability
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 197/471 Part 2 - Specification
+ID Precondition Requirement definition Note
+G04.FR.01 In the case the evse field is omitted in
+ChangeAvailabilityRequest.
+The Charging Station status change SHALL apply to
+the whole Charging Station.
+G04.FR.02 Upon receipt of
+ChangeAvailabilityRequest.
+The Charging Station SHALL respond with
+ChangeAvailabilityResponse.
+G04.FR.03 G04.FR.02 This response message SHALL indicate whether
+the Charging Station is able to change to the
+requested availability.
+G04.FR.04 In the event that CSMS requests the
+Charging Station to change to the
+state it is already in.
+The Charging Station SHALL respond with
+availability status Accepted.
+G04.FR.05 When an availability change request
+with ChangeAvailabilityRequest has
+happened.
+The Charging Station SHALL inform the CSMS by
+sending the status of each of the changed
+connectors via a StatusNotificationRequest
+As described in
+ConnectorStatusEnumTy
+pe
+G04.FR.06 When a transaction is in progress. The Charging Station SHALL respond with
+availability status Scheduled to indicate that it is
+scheduled to occur after the transaction has
+finished.
+G04.FR.07 When the availability of the Charging
+Station becomes Inoperative
+(Unavailable, Faulted)
+All operative EVSEs and connectors (i.e. not
+Faulted) SHALL become Unavailable.
+G04.FR.08 When the availability of the Charging
+Station becomes Operative
+The Charging Station SHALL revert the status of all
+EVSEs and connectors to their original status.
+See Note 1.
+G04.FR.09 When the availability of a Charging
+Station has been set explicitly via
+ChangeAvailabilityRequest
+The set availability state SHALL be persistent
+across reboot/power loss.
+NOTE
+1. The Charging Station, EVSEs and Connectors have separate / individual states. This means (for example) that
+when setting a connector to Inoperative, then setting the connected EVSE to Inoperative and thereafter change
+the EVSE back to operative, the connector will remain Inoperative.
+NOTE 2. It is only required to report a status change of a connector. StatusNotificationRequest only supports the
+reporting of connector statuses.
+Edition 2 FINAL, 2022-12-15 G. Availability
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 198/471 Part 2 - Specification

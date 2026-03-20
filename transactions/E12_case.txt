@@ -1,0 +1,194 @@
+E12 - Inform CSMS of an Offline Occurred Transaction
+Test Cases
+================================================================================
+
+TC-E12-001
+Title: Charging Station queues TransactionEventRequest messages while Offline
+Requirement: E12.FR.01
+Steps:
+  1. Confirm the Charging Station is in Offline state (no connection to the CSMS).
+  2. Initiate a transaction on the Charging Station (e.g., EV connects and authorisation occurs).
+  3. Observe the Charging Station's internal message queue.
+Expected Result:
+  All TransactionEventRequest messages that would have been sent to the CSMS (eventType = Started,
+  eventType = Updated, eventType = Ended) are stored in the Charging Station's internal queue.
+  No TransactionEventRequest messages are transmitted over the network while the station remains Offline.
+
+--------------------------------------------------------------------------------
+
+TC-E12-002
+Title: Queued TransactionEventRequest messages are sent with offline = TRUE after reconnection
+Requirement: E12.FR.02
+Steps:
+  1. Ensure at least one complete transaction has occurred while the Charging Station was Offline,
+     and those TransactionEventRequest messages are in the queue.
+  2. Restore the network connection between the Charging Station and the CSMS.
+  3. Observe the messages transmitted by the Charging Station to the CSMS.
+Expected Result:
+  The Charging Station sends each queued TransactionEventRequest message to the CSMS.
+  Every such message contains the field "offline" set to TRUE.
+  Messages are sent in the order they were queued (Started before Updated before Ended for the same transaction).
+  The CSMS receives and responds to each message with a TransactionEventResponse.
+
+--------------------------------------------------------------------------------
+
+TC-E12-003
+Title: Heartbeat is sent before queued TransactionEventRequest messages after reconnection
+Requirement: E12.FR.02
+Steps:
+  1. Ensure at least one transaction occurred while the Charging Station was Offline.
+  2. Restore the network connection.
+  3. Capture all messages sent by the Charging Station immediately after reconnection.
+Expected Result:
+  The Charging Station sends a HeartbeatRequest to the CSMS before transmitting any queued
+  TransactionEventRequest messages.
+  The CSMS responds with a HeartbeatResponse.
+  Only after the HeartbeatResponse is received does the Charging Station begin sending queued
+  TransactionEventRequest messages.
+
+--------------------------------------------------------------------------------
+
+TC-E12-004
+Title: Meter values are included in TransactionEventRequest (eventType = Updated) when configured
+Requirement: E12.FR.03
+Steps:
+  1. Configure the Charging Station to include meter data in TransactionEventRequest messages
+     with eventType = Updated (set SampledDataTxUpdatedMeasurands or equivalent configuration variable).
+  2. Allow the Charging Station to go Offline and complete a transaction that produces intermediate
+     Updated events.
+  3. Restore the connection and observe the queued TransactionEventRequest(eventType = Updated)
+     messages sent to the CSMS.
+Expected Result:
+  Each TransactionEventRequest with eventType = Updated contains the optional "meterValue" field
+  populated with measurand values matching the configured measurands.
+  The measurand types, units, and contexts present in "meterValue" correspond exactly to the
+  configured measurands.
+
+--------------------------------------------------------------------------------
+
+TC-E12-005
+Title: Charging Station may drop Updated messages when low on memory
+Requirement: E12.FR.04
+Steps:
+  1. Configure the Charging Station to include meter data in TransactionEventRequest(eventType = Updated).
+  2. Force the Charging Station into a low-memory state (simulate or configure memory threshold).
+  3. Allow a long transaction to occur while Offline so that many Updated events are generated.
+  4. Restore connection and observe the set of queued messages transmitted.
+Expected Result:
+  The Charging Station may omit one or more TransactionEventRequest(eventType = Updated) messages
+  from those it transmits to the CSMS.
+  TransactionEventRequest(eventType = Started) and TransactionEventRequest(eventType = Ended) are
+  never dropped; they must still be transmitted.
+  The offline flag remains TRUE on all transmitted messages.
+
+--------------------------------------------------------------------------------
+
+TC-E12-006
+Title: When dropping Updated messages, intermediate messages are dropped first
+Requirement: E12.FR.05
+Steps:
+  1. Configure the Charging Station to include meter data in TransactionEventRequest(eventType = Updated).
+  2. Force a low-memory condition while Offline so that the Charging Station must drop some
+     Updated messages from the queue.
+  3. Record the sequence numbers (1st, 2nd, 3rd, ...) of the Updated messages generated during the transaction.
+  4. Restore connection and capture all TransactionEventRequest(eventType = Updated) messages sent to the CSMS.
+Expected Result:
+  The messages that are dropped are the odd-indexed intermediate messages (1st, 3rd, 5th, etc. of the
+  interior sequence), not the first message in the queue and not the last message in the queue.
+  The Charging Station does not stop adding new Updated messages to the queue prematurely.
+  The first queued Updated message and the most recent Updated message are retained when possible.
+
+--------------------------------------------------------------------------------
+
+TC-E12-007
+Title: Large meter data for a single Updated event may be split across multiple messages
+Requirement: E12.FR.06
+Steps:
+  1. Configure the Charging Station to include meter data in TransactionEventRequest(eventType = Updated).
+  2. Generate a transaction Offline where a single Updated event produces more measurand data than
+     fits in one TransactionEventRequest message.
+  3. Restore connection and observe the TransactionEventRequest(eventType = Updated) messages sent
+     to the CSMS for that event.
+Expected Result:
+  The Charging Station sends two or more TransactionEventRequest(eventType = Updated) messages
+  for the same logical Updated event.
+  All such split messages share the same "timestamp" value.
+  The combined meterValue data across all split messages equals the full set of measurands recorded
+  for that event.
+  Each split message contains the offline flag set to TRUE.
+
+--------------------------------------------------------------------------------
+
+TC-E12-008
+Title: Meter values are included in TransactionEventRequest (eventType = Ended) when configured
+Requirement: E12.FR.07
+Steps:
+  1. Configure the Charging Station to include meter data in TransactionEventRequest(eventType = Ended)
+     (set SampledDataTxEndedMeasurands or equivalent configuration variable).
+  2. Allow the Charging Station to go Offline and complete a transaction (start and stop).
+  3. Restore connection and capture the TransactionEventRequest(eventType = Ended) message sent
+     to the CSMS.
+Expected Result:
+  The TransactionEventRequest with eventType = Ended contains the optional "meterValue" field
+  populated with measurand values.
+  The measurand types present in "meterValue" match the configured measurands for end-of-transaction
+  reporting.
+  The offline field is set to TRUE.
+
+--------------------------------------------------------------------------------
+
+TC-E12-009
+Title: Charging Station may drop meter data in Ended message when low on memory
+Requirement: E12.FR.08
+Steps:
+  1. Configure the Charging Station to include meter data in TransactionEventRequest(eventType = Ended).
+  2. Force a low-memory condition while Offline so that the Charging Station cannot store all meter
+     values for the Ended event.
+  3. Complete a transaction Offline that records many meter values at end-of-transaction.
+  4. Restore connection and capture the TransactionEventRequest(eventType = Ended) sent to the CSMS.
+Expected Result:
+  The Charging Station sends the TransactionEventRequest(eventType = Ended) to the CSMS.
+  The "meterValue" field may contain fewer values than were originally recorded (some values may
+  have been dropped).
+  The message is still sent; it is only the meter data within it that may be reduced — the Ended
+  event itself is not dropped.
+  The offline flag is set to TRUE.
+
+--------------------------------------------------------------------------------
+
+TC-E12-010
+Title: When dropping meter values from Ended message, intermediate values are dropped first
+Requirement: E12.FR.09
+Steps:
+  1. Configure the Charging Station to include meter data in TransactionEventRequest(eventType = Ended).
+  2. Force a low-memory condition while Offline so that meter values must be dropped from the
+     Ended message.
+  3. Record the ordered sequence of meter values captured at end-of-transaction (1st, 2nd, 3rd, ...).
+  4. Restore connection and capture the TransactionEventRequest(eventType = Ended) sent to the CSMS.
+  5. Inspect the meterValue list in the Ended message.
+Expected Result:
+  The dropped values are the odd-indexed interior values (1st, 3rd, 5th, etc. of the intermediate
+  values), not the values at the start or end of the list.
+  The Charging Station does not stop adding newly sampled values to the list prematurely.
+  The first value and the most recently sampled value are retained when possible.
+
+--------------------------------------------------------------------------------
+
+TC-E12-011
+Title: Signed meter values are placed in signedMeterValue field when SampledDataSignReadings is true
+Requirement: E12.FR.10
+Steps:
+  1. Set the configuration variable SampledDataSignReadings to TRUE on the Charging Station.
+  2. Allow the Charging Station to go Offline and complete a transaction.
+  3. Restore connection and capture all TransactionEventRequest messages sent to the CSMS.
+  4. Inspect the sampledValues entries within the meterValue field of each message.
+Expected Result:
+  Each sampledValue entry that contains signed meter data includes a populated "signedMeterValue"
+  field.
+  The "signedMeterValue" field contains the signed meter reading retrieved from the meter hardware.
+  The signed data is not placed in any other field (e.g., not in the "value" field as a raw string).
+  The offline flag is set to TRUE on all transmitted TransactionEventRequest messages.
+
+================================================================================
+END OF TEST CASES
+================================================================================

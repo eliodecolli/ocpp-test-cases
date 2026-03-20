@@ -1,0 +1,53 @@
+C04 - Authorization using PIN-code
+C04 - Authorization using PIN-code
+C04 - Authorization using PIN-code
+C04 - Authorization using PIN-code
+This is an informative use case, its purpose is to demonstrate the use of the KeyCode id type. An other use of KeyCode is for
+example a licence plate number.
+Table 65. C04 - Authorization using PIN-code
+No. Type Description
+1 Name Authorization using PIN-code
+2 ID C04
+Functional block C. Authorization
+3 Objectives To make it possible for a Charging Station that has a key entry terminal to authorize the PIN-code.
+4 Description When a Charging Station has a PIN-code entry terminal, an EV driver enters his/her PIN-code. This
+PIN-code is sent to the CSMS for validation using an AuthorizeRequest.
+Actors EV Driver, Charging Station, CSMS
+Scenario description 1. The EV Driver wants to start or stop charging the EV and enters his/her PIN-code into the
+terminal.
+2. The Charging Station sends an AuthorizeRequest message, with the field: IdTokenEnumType
+set to KeyCode, to the CSMS to request authorization.
+3. Upon receipt of the AuthorizeRequest, the CSMS responds with an AuthorizeResponse. This
+response indicates whether or not the KeyCode is accepted by the CSMS.
+Alternative scenario(s) C04 - Authorization using PIN-code - Requirements
+Table 66. C04 - Authorization using PIN-code - Requirements
+ID. Precondition Requirement definition
+C04.FR.01 When the CSMS receives an AuthorizeRequest
+with a keyCode that is not valid at this Charging
+Station
+The CSMS SHALL respond with an AuthorizeResponse message
+with status = Invalid.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 82/471 Part 2 - Specification
+ID. Precondition Requirement definition
+C04.FR.02 When the CSMS receives an AuthorizeRequest
+with a keyCode that is valid and the EV Driver is
+allowed to charge at this Charging Station
+The CSMS SHALL respond with an AuthorizeResponse message
+with status = Accepted.
+C04.FR.03 A Charging Station MAY store keyCodes in the Authorization
+Cache.
+C04.FR.04 If an idToken of type keyCode is used The Charging Station or CSMS SHALL NOT show the IdToken in
+any logging. key codes should never appear in logs.
+C04.FR.05 Language SHALL be specified as RFC-5646 tags, see: [RFC5646],
+for example: US English is: "en-US".
+C04.FR.06 If an idToken of type keyCode is used It is RECOMMENDED to take measures to prevent brute force
+attacks, for example by increasing backoff times after attempts
+to enter an incorrect keyCode.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 83/471 Part 2 - Specification
+C04 - Authorization using PIN-code
+C04 - Authorization using PIN-code
+C04 - Authorization using PIN-code
+C04 - Authorization using PIN-code
+C04 - Authorization using PIN-code

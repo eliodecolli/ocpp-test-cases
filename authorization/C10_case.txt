@@ -1,0 +1,609 @@
+C10 - Store Authorization Data in the Authorization Cache
+Test Cases
+===========================================================
+
+OVERVIEW
+--------
+The C10 use case defines how a Charging Station stores IdToken authorization data in its
+local Authorization Cache. The cache holds the latest IdTokenInfo received from the CSMS
+(Central System Management System) via AuthorizeResponse, TransactionEventResponse, or
+ReserveNowRequest messages. This allows the Charging Station to make faster local
+authorization decisions without always consulting the CSMS.
+
+===========================================================
+TEST CASE 1: Store IdTokenInfo from AuthorizeResponse (Happy Path)
+===========================================================
+Title: Cache updated after successful AuthorizeResponse
+
+Scenario:
+A driver presents an RFID token at the Charging Station. The Charging Station sends an
+AuthorizeRequest to the CSMS and receives an AuthorizeResponse containing IdTokenInfo.
+
+Prerequisites:
+- Authorization Cache is implemented on the Charging Station.
+- AuthCacheEnabled configuration variable is set to true.
+- The cache does not already contain an entry for this IdToken.
+
+Steps:
+1. A driver presents an IdToken (e.g., an RFID card) at the Charging Station.
+2. The Charging Station sends an AuthorizeRequest containing the IdToken to the CSMS.
+3. The CSMS responds with an AuthorizeResponse that includes IdTokenInfo (e.g., status Accepted).
+4. Observe the state of the Authorization Cache on the Charging Station.
+
+Expected Result:
+- The Charging Station stores the received IdTokenInfo (including its status) into the
+  Authorization Cache, keyed by the IdToken.
+- The cache entry reflects the exact IdTokenInfo received from the CSMS.
+- No information is lost or altered during storage.
+
+
+===========================================================
+TEST CASE 2: Update Existing Cache Entry from AuthorizeResponse (Happy Path)
+===========================================================
+Title: Existing cache entry overwritten with latest IdTokenInfo from AuthorizeResponse
+
+Scenario:
+An IdToken already exists in the Authorization Cache from a previous interaction. The
+same token is presented again, a new AuthorizeRequest is sent, and the CSMS returns
+updated IdTokenInfo (e.g., status changed from Accepted to Blocked).
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+- The cache already contains an entry for the IdToken being tested.
+
+Steps:
+1. Confirm that the Authorization Cache already holds an entry for a specific IdToken
+   (e.g., status Accepted).
+2. The driver presents the same IdToken at the Charging Station.
+3. The Charging Station sends an AuthorizeRequest to the CSMS.
+4. The CSMS responds with an AuthorizeResponse containing updated IdTokenInfo
+   (e.g., status now Blocked).
+5. Observe the Authorization Cache entry for this IdToken.
+
+Expected Result:
+- The old cache entry for the IdToken is replaced with the newly received IdTokenInfo.
+- The cache entry now reflects the updated status (Blocked in this example).
+- The cache always holds the latest received data, not historical data.
+
+
+===========================================================
+TEST CASE 3: Store IdTokenInfo from TransactionEventResponse (Happy Path)
+===========================================================
+Title: Cache updated upon receipt of TransactionEventResponse
+
+Scenario:
+The Charging Station sends a TransactionEventRequest to the CSMS during a charging
+session (e.g., at session start or stop). The CSMS responds with a
+TransactionEventResponse that includes IdTokenInfo.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+- A charging transaction is in progress or initiating.
+
+Steps:
+1. The Charging Station sends a TransactionEventRequest to the CSMS (e.g., for a
+   Started or Updated event) containing the IdToken.
+2. The CSMS responds with a TransactionEventResponse that includes IdTokenInfo.
+3. Observe the Authorization Cache on the Charging Station.
+
+Expected Result:
+- The Charging Station updates the Authorization Cache with the IdTokenInfo from the
+  TransactionEventResponse.
+- The cache entry for the relevant IdToken reflects the latest received IdTokenInfo.
+
+
+===========================================================
+TEST CASE 4: Store IdTokenInfo from ReserveNowRequest (Happy Path)
+===========================================================
+Title: Cache updated when ReserveNowRequest is received from CSMS
+
+Scenario:
+The CSMS sends a ReserveNowRequest to the Charging Station to reserve a connector for
+a specific driver. The request includes an IdToken.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+
+Steps:
+1. The CSMS sends a ReserveNowRequest to the Charging Station. The request contains an
+   IdToken (and associated IdTokenInfo).
+2. The Charging Station processes the request and sends a ReserveNowResponse back to
+   the CSMS.
+3. The Charging Station stores the IdTokenInfo from the ReserveNowRequest into the
+   Authorization Cache.
+4. Observe the Authorization Cache.
+
+Expected Result:
+- The cache is updated with the IdTokenInfo from the ReserveNowRequest (not the
+  response, since the IdToken comes in the request in this flow).
+- The entry is stored regardless of whether the reservation was accepted or rejected.
+
+
+===========================================================
+TEST CASE 5: Cache Contains All Latest Received Identifiers Regardless of Status (C10.FR.01)
+===========================================================
+Title: Cache stores tokens with any status, not just Accepted
+
+Scenario:
+Multiple IdTokens are processed over time, with varying authorization statuses
+(Accepted, Blocked, Expired, Invalid, etc.). The cache must store all of them.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+
+Steps:
+1. Present IdToken A and receive an AuthorizeResponse with status Accepted. Observe cache.
+2. Present IdToken B and receive an AuthorizeResponse with status Blocked. Observe cache.
+3. Present IdToken C and receive an AuthorizeResponse with status Invalid. Observe cache.
+4. Present IdToken D and receive an AuthorizeResponse with status Expired. Observe cache.
+
+Expected Result:
+- All four IdTokens (A, B, C, D) are stored in the Authorization Cache.
+- Each entry reflects the exact status received from the CSMS.
+- The cache does not filter out or exclude tokens with non-Accepted statuses.
+
+
+===========================================================
+TEST CASE 6: Cache Persistence Across Reboot (C10.FR.02)
+===========================================================
+Title: Authorization Cache survives a Charging Station reboot
+
+Scenario:
+The Authorization Cache is populated with several IdToken entries. The Charging Station
+is then rebooted. The cache should persist after the reboot.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+- The cache contains at least one IdToken entry before the reboot.
+
+Steps:
+1. Populate the Authorization Cache with one or more IdToken entries by processing
+   AuthorizeResponses or TransactionEventResponses.
+2. Record the current state of the Authorization Cache (which tokens are stored and
+   their statuses).
+3. Reboot the Charging Station (simulated or physical power cycle).
+4. After the reboot, inspect the Authorization Cache.
+
+Expected Result:
+- All IdToken entries that were in the cache before the reboot are still present after
+  the reboot.
+- No cache entries are lost due to the reboot.
+- The cache data is stored in non-volatile (persistent) memory.
+
+
+===========================================================
+TEST CASE 7: Cache Persistence Across Power Outage (C10.FR.02)
+===========================================================
+Title: Authorization Cache survives a sudden power outage
+
+Scenario:
+Similar to the reboot test, but the power is cut abruptly without a graceful shutdown,
+simulating a real-world power failure.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+- The cache contains at least one IdToken entry before the power outage.
+
+Steps:
+1. Populate the Authorization Cache with one or more IdToken entries.
+2. Record which tokens are stored and their statuses.
+3. Simulate a sudden power outage (cut power without graceful shutdown).
+4. Restore power and allow the Charging Station to boot up.
+5. Inspect the Authorization Cache after boot.
+
+Expected Result:
+- Cache entries that existed before the power outage should still be present after
+  power is restored.
+- No cache entries should be silently lost due to the ungraceful shutdown.
+
+
+===========================================================
+TEST CASE 8: Online Re-authorization for Non-Accepted Cached Token (C10.FR.03)
+===========================================================
+Title: Charging Station sends AuthorizeRequest to CSMS for a cached token with non-Accepted status
+
+Scenario:
+A driver presents an IdToken that is already in the Authorization Cache but with a
+status other than Accepted (e.g., Blocked or Expired). The Charging Station is online.
+It must not rely on the cached non-Accepted status and must verify with the CSMS.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+- The cache contains an entry for IdToken X with status Blocked (or any non-Accepted status).
+- The Charging Station is online and able to reach the CSMS.
+
+Steps:
+1. Confirm the cache contains IdToken X with status Blocked.
+2. The driver presents IdToken X at the Charging Station.
+3. Observe the behavior of the Charging Station.
+
+Expected Result:
+- The Charging Station does NOT immediately deny authorization based on the cached
+  Blocked status.
+- Instead, the Charging Station sends an AuthorizeRequest to the CSMS to verify the
+  current state of the token.
+- The CSMS response is used for the authorization decision.
+- After receiving the AuthorizeResponse, the cache entry for IdToken X is updated.
+
+
+===========================================================
+TEST CASE 9: Cache Update After AuthorizeResponse (C10.FR.04)
+===========================================================
+Title: Cache entry is updated immediately upon receipt of AuthorizeResponse
+
+Scenario:
+Validate that the Charging Station updates the cache entry as soon as it receives the
+AuthorizeResponse, with the exact IdTokenInfo from the response.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+
+Steps:
+1. Trigger an AuthorizeRequest for an IdToken (either new or already cached).
+2. The CSMS returns an AuthorizeResponse with IdTokenInfo (e.g., status Accepted,
+   with optional group token info).
+3. Immediately after the response is received, inspect the Authorization Cache.
+
+Expected Result:
+- The cache entry for the IdToken is updated with the IdTokenInfo from the
+  AuthorizeResponse.
+- The update happens upon receipt of the response, not at a later time.
+- The full IdTokenInfo as described by the Authorization Cache specification is stored.
+
+
+===========================================================
+TEST CASE 10: Cache Update After TransactionEventResponse (C10.FR.05)
+===========================================================
+Title: Cache entry is updated upon receipt of TransactionEventResponse
+
+Scenario:
+Validate that receiving a TransactionEventResponse with IdTokenInfo causes the
+Charging Station to update the Authorization Cache entry.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+
+Steps:
+1. The Charging Station sends a TransactionEventRequest (e.g., at session start).
+2. The CSMS responds with TransactionEventResponse containing IdTokenInfo.
+3. Inspect the Authorization Cache entry for the IdToken used in the transaction.
+
+Expected Result:
+- The cache entry for the IdToken is updated with the IdTokenInfo from the
+  TransactionEventResponse.
+- The update reflects the exact IdTokenInfo returned by the CSMS.
+
+
+===========================================================
+TEST CASE 11: Cache Update from ReserveNowRequest (C10.FR.06)
+===========================================================
+Title: Cache entry is updated upon receipt of ReserveNowRequest
+
+Scenario:
+The CSMS sends a ReserveNowRequest containing an IdToken. The Charging Station should
+update the Authorization Cache using the IdTokenInfo from this request.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+
+Steps:
+1. The CSMS sends a ReserveNowRequest to the Charging Station, including an IdToken.
+2. The Charging Station responds with a ReserveNowResponse.
+3. Inspect the Authorization Cache for the IdToken included in the ReserveNowRequest.
+
+Expected Result:
+- The cache entry for the IdToken is created or updated using the IdTokenInfo from
+  the ReserveNowRequest (not from the response, as the request carries the token info).
+
+
+===========================================================
+TEST CASE 12: Cache Full - Eviction of Old Entries (C10.FR.07)
+===========================================================
+Title: New cache entries can be added when cache is full by evicting older entries
+
+Scenario:
+The Authorization Cache is completely full. A new IdToken entry needs to be stored.
+The Charging Station must evict older entries to make room.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+- The cache is at maximum capacity with existing entries.
+
+Steps:
+1. Fill the Authorization Cache to its maximum capacity.
+2. Trigger an AuthorizeResponse for a new IdToken not currently in the cache.
+3. Observe whether the cache stores the new entry.
+4. Observe which existing entry was removed to make space.
+
+Expected Result:
+- The Charging Station successfully stores the new IdToken entry in the cache.
+- An older entry is removed to make space for the new entry.
+- The eviction strategy prioritizes removing entries with non-Accepted statuses first.
+- If all entries have Accepted status, the oldest entry is removed.
+- The new entry is present in the cache after the operation.
+
+
+===========================================================
+TEST CASE 13: Cache Full - Non-Accepted Entries Evicted Before Accepted Entries (C10.FR.07)
+===========================================================
+Title: Non-Accepted entries are removed before Accepted entries when cache is full
+
+Scenario:
+The cache is full and contains a mix of Accepted and non-Accepted entries (e.g.,
+Blocked, Invalid). A new entry must be stored.
+
+Prerequisites:
+- Authorization Cache is at maximum capacity.
+- Cache contains at least one entry with status other than Accepted.
+
+Steps:
+1. Fill the Authorization Cache with a mix of Accepted and non-Accepted entries.
+2. Record which entries are Accepted and which are not.
+3. Trigger a new authorization that results in a new IdToken needing to be cached.
+4. Observe the cache after the new entry is stored.
+
+Expected Result:
+- A non-Accepted entry is removed first to make space for the new entry.
+- No Accepted entries are removed as long as a non-Accepted entry exists to remove.
+- The new entry appears in the cache after the operation.
+
+
+===========================================================
+TEST CASE 14: Cache Entry Expiry Based on AuthCacheLifeTime (C10.FR.08, C10.FR.10)
+===========================================================
+Title: Cache entry expires after AuthCacheLifeTime duration since last use
+
+Scenario:
+An IdToken is stored in the Authorization Cache. The AuthCacheLifeTime configuration
+variable defines how long an unused entry lives in the cache. After the lifetime
+expires, the entry should be removed or marked as Expired.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+- AuthCacheLifeTime is set to a known value (e.g., 60 seconds for testing).
+
+Steps:
+1. Trigger an authorization for an IdToken so it is stored in the cache with a
+   timestamp of last use.
+2. Wait for longer than the AuthCacheLifeTime duration without using the IdToken.
+3. Inspect the Authorization Cache.
+
+Expected Result:
+- The cache entry for the IdToken is either removed from the cache or its status is
+  changed to Expired.
+- The Charging Station treats the entry as invalid after expiry.
+- The expiry is based on time since last use, not based on the IdToken's own
+  expiration date (e.g., physical RFID card expiry date).
+
+
+===========================================================
+TEST CASE 15: AuthCacheLifeTime Reset on Token Use (C10.FR.08)
+===========================================================
+Title: Cache lifetime timer resets when an IdToken is used
+
+Scenario:
+An IdToken is in the cache. The driver uses the token again before the AuthCacheLifeTime
+expires. The lifetime timer should reset upon use so the entry does not expire
+prematurely.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+- AuthCacheLifeTime is set to a known value (e.g., 60 seconds).
+
+Steps:
+1. Store an IdToken in the cache by processing an authorization.
+2. Wait until just before the AuthCacheLifeTime would expire (e.g., 55 seconds).
+3. Use the IdToken again (present it at the Charging Station, triggering a new
+   authorization interaction that refreshes the cache).
+4. Wait for another duration slightly less than AuthCacheLifeTime after the second use.
+5. Inspect the cache entry.
+
+Expected Result:
+- The cache entry is still valid after the second wait period because the timer
+  was reset on the second use.
+- The entry is NOT expired as long as it has been used within the AuthCacheLifeTime
+  window.
+
+
+===========================================================
+TEST CASE 16: Tariff Information Not Stored in Cache (C10.FR.09)
+===========================================================
+Title: Tariff and cost information is not stored in the Authorization Cache
+
+Scenario:
+The Charging Station supports Tariff and Cost features. When an AuthorizeResponse or
+TransactionEventResponse includes tariff information, this data must not be stored in
+the Authorization Cache.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+- The Charging Station supports the Tariff and Cost feature.
+
+Steps:
+1. Trigger an authorization where the CSMS response includes both IdTokenInfo and
+   tariff/cost information.
+2. Inspect the Authorization Cache entry stored for the IdToken.
+
+Expected Result:
+- The Authorization Cache entry contains IdTokenInfo data only.
+- No tariff or cost information is present in the cached entry.
+
+
+===========================================================
+TEST CASE 17: Authorization Cache Disabled (C10.FR.11)
+===========================================================
+Title: Authorization Cache is not used when AuthCacheEnabled is set to false
+
+Scenario:
+The AuthCacheEnabled configuration variable is set to false. The Charging Station should
+not store any data in the Authorization Cache, even when AuthorizeResponse or
+TransactionEventResponse messages are received.
+
+Prerequisites:
+- Authorization Cache feature is present on the Charging Station.
+- AuthCacheEnabled configuration variable is set to false.
+
+Steps:
+1. Confirm AuthCacheEnabled is set to false.
+2. Present an IdToken at the Charging Station.
+3. The Charging Station sends an AuthorizeRequest and receives an AuthorizeResponse
+   with IdTokenInfo.
+4. Inspect the Authorization Cache.
+
+Expected Result:
+- No new entry is added to the Authorization Cache.
+- The Charging Station does not use the cache for authorization decisions while
+  AuthCacheEnabled is false.
+
+
+===========================================================
+TEST CASE 18: Authorization Cache Re-enabled After Being Disabled (C10.FR.11)
+===========================================================
+Title: Cache resumes storing entries when AuthCacheEnabled is switched back to true
+
+Scenario:
+AuthCacheEnabled was previously disabled and is then re-enabled. The Charging Station
+should resume storing and using the Authorization Cache.
+
+Prerequisites:
+- Authorization Cache is implemented.
+- AuthCacheEnabled is initially false, then changed to true.
+
+Steps:
+1. Set AuthCacheEnabled to false and confirm no caching occurs (similar to Test Case 17).
+2. Change AuthCacheEnabled to true.
+3. Present an IdToken at the Charging Station.
+4. The Charging Station receives an AuthorizeResponse with IdTokenInfo.
+5. Inspect the Authorization Cache.
+
+Expected Result:
+- After AuthCacheEnabled is set to true, the Charging Station resumes storing
+  IdTokenInfo in the Authorization Cache.
+- The new token entry is present in the cache after the authorization exchange.
+
+
+===========================================================
+TEST CASE 19: Secure Storage of Personal Information in Cache (C10.FR.12)
+===========================================================
+Title: IdToken personal data is stored securely in the Authorization Cache
+
+Scenario:
+The Authorization Cache stores IdToken data, which may include personal identifying
+information (e.g., an RFID card UID). The system should store this information securely,
+for example by hashing the IdToken values.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+
+Steps:
+1. Trigger an authorization for an IdToken containing personal information.
+2. Inspect the stored cache entry (e.g., by reading cache storage or debug output).
+
+Expected Result:
+- The IdToken stored in the Authorization Cache is hashed or otherwise protected
+  rather than stored in plain text.
+- An attacker with access to the cache storage cannot trivially recover the original
+  IdToken values.
+
+
+===========================================================
+TEST CASE 20: Cache Not Updated When AuthCacheEnabled is False During a Transaction (C10.FR.11)
+===========================================================
+Title: TransactionEventResponse does not update cache when AuthCacheEnabled is false
+
+Scenario:
+AuthCacheEnabled is false. A transaction completes and the Charging Station receives
+a TransactionEventResponse with IdTokenInfo. The cache should remain unaffected.
+
+Prerequisites:
+- Authorization Cache is implemented.
+- AuthCacheEnabled is set to false.
+
+Steps:
+1. Set AuthCacheEnabled to false.
+2. Start and complete a charging transaction.
+3. The CSMS sends a TransactionEventResponse with IdTokenInfo.
+4. Inspect the Authorization Cache.
+
+Expected Result:
+- The Authorization Cache is not updated.
+- No entry is added or modified in the cache as a result of the TransactionEventResponse.
+
+
+===========================================================
+TEST CASE 21: Multiple Triggers in Same Session Update Cache Correctly (Happy Path)
+===========================================================
+Title: Cache is correctly updated by multiple message types within a single session
+
+Scenario:
+During a single charging session, the Charging Station receives IdTokenInfo via both
+an AuthorizeResponse and a TransactionEventResponse. Each should update the cache,
+with the most recently received data taking precedence.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+
+Steps:
+1. A driver presents an IdToken. The Charging Station sends an AuthorizeRequest and
+   receives an AuthorizeResponse with IdTokenInfo (status Accepted). Cache is updated.
+2. The Charging Station starts the session and sends a TransactionEventRequest.
+3. The CSMS replies with a TransactionEventResponse containing updated IdTokenInfo
+   (e.g., same token, same status, but potentially different expiry or group info).
+4. Inspect the cache after each step.
+
+Expected Result:
+- After step 1, the cache holds the IdTokenInfo from the AuthorizeResponse.
+- After step 3, the cache entry is updated with the IdTokenInfo from the
+  TransactionEventResponse.
+- The cache always reflects the most recently received IdTokenInfo for the token.
+
+
+===========================================================
+TEST CASE 22: Cache Entry Not Stored if No IdTokenInfo in Response
+===========================================================
+Title: Cache is not updated when a response does not include IdTokenInfo
+
+Scenario:
+The Charging Station receives a TransactionEventResponse that does not contain
+IdTokenInfo (this is optional in the protocol). The cache should not be updated with
+incomplete or absent data.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+
+Steps:
+1. The Charging Station sends a TransactionEventRequest to the CSMS.
+2. The CSMS replies with a TransactionEventResponse that does not include IdTokenInfo.
+3. Inspect the Authorization Cache.
+
+Expected Result:
+- The Authorization Cache is not updated because no IdTokenInfo was received.
+- Any existing cache entry for the related IdToken remains unchanged.
+
+
+===========================================================
+TEST CASE 23: Cache Handles Concurrent Requests for the Same IdToken
+===========================================================
+Title: Concurrent authorization requests for the same token result in a consistent cache entry
+
+Scenario:
+Two simultaneous or near-simultaneous authorization interactions occur for the same
+IdToken (e.g., due to rapid re-presentation at the same or different connectors). The
+cache should end up in a consistent state.
+
+Prerequisites:
+- Authorization Cache is implemented and AuthCacheEnabled is true.
+- The Charging Station supports multiple connectors.
+
+Steps:
+1. Simultaneously present the same IdToken at two different connectors.
+2. Two AuthorizeRequests are sent to the CSMS, and two AuthorizeResponses are received
+   (possibly with the same or slightly different IdTokenInfo).
+3. Inspect the Authorization Cache entry for the IdToken after both responses are
+   processed.
+
+Expected Result:
+- The cache ends up with exactly one entry for the IdToken.
+- The entry reflects one of the two received IdTokenInfo values (no corruption, no
+  duplicate entries, and no crash).
+- The system handles the concurrent update gracefully.

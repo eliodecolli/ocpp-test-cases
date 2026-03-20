@@ -1,0 +1,184 @@
+B08 - Get Custom Report - Test Cases
+
+GOAL: Allow the CSMS to request a filtered report from a Charging Station. The report is limited to components and variables matching specified ComponentCriteria and/or a list of ComponentVariables. Results are returned asynchronously.
+
+================================================================================
+
+TEST CASE 1: Request a custom report with componentCriteria only
+Scenario: CSMS filters the report by a ComponentCriteria (e.g., Active).
+Steps:
+  1. CSMS sends GetReportRequest(requestId = X, componentCriteria = [Active]).
+  2. Charging Station responds with GetReportResponse(status = Accepted).
+  3. Charging Station sends one or more NotifyReportRequest messages.
+  4. CSMS responds with NotifyReportResponse for each.
+Expected result:
+  - Report includes only components that have the variable Active set to true, or that do not have an Active variable.
+  - All NotifyReportRequests contain requestId X and include variableCharacteristics.
+  - seqNo starts at 0 and increments.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 2: Request a custom report with componentCriteria = Available
+Scenario: CSMS filters by the Available criterion.
+Steps:
+  1. CSMS sends GetReportRequest(requestId = X, componentCriteria = [Available]).
+  2. Charging Station responds and sends the report.
+Expected result:
+  - Report includes every component that has the variable Available set to true, or does not have an Available variable.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 3: Request a custom report with componentCriteria = Enabled
+Scenario: CSMS filters by the Enabled criterion.
+Steps:
+  1. CSMS sends GetReportRequest(requestId = X, componentCriteria = [Enabled]).
+Expected result:
+  - Report includes every component that has the variable Enabled set to true, or does not have an Enabled variable.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 4: Request a custom report with componentCriteria = Problem
+Scenario: CSMS filters to only components currently in a problem state.
+Steps:
+  1. CSMS sends GetReportRequest(requestId = X, componentCriteria = [Problem]).
+Expected result:
+  - Report includes only components that have the variable Problem set to true.
+  - Components without a Problem variable are excluded.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 5: Multiple componentCriteria — logical OR
+Scenario: CSMS specifies more than one criterion (e.g., Active AND Problem).
+Steps:
+  1. CSMS sends GetReportRequest(componentCriteria = [Active, Problem]).
+  2. Charging Station processes the request.
+Expected result:
+  - Report includes all components that satisfy AT LEAST ONE of the given criteria (logical OR).
+  - A component matching either criterion is included.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 6: Request with componentVariables only (no componentCriteria)
+Scenario: CSMS requests specific component-variable combinations without any criteria filter.
+Steps:
+  1. CSMS sends GetReportRequest(requestId = X, componentVariables = [<list of specific entries>]).
+  2. componentCriteria is absent.
+  3. Charging Station responds.
+Expected result:
+  - Report is limited to the specified componentVariables.
+  - variableCharacteristics are included in the response.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 7: componentVariable without instance — report all instances
+Scenario: A componentVariable entry does not specify a component.instance or component.evse.
+Steps:
+  1. CSMS sends GetReportRequest with a componentVariable entry where instance and/or evse are missing.
+  2. Charging Station responds.
+Expected result:
+  - Charging Station reports for every instance and/or EVSE of that component.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 8: componentVariable without variable — report all variables of that component
+Scenario: A componentVariable entry specifies a component but omits the variable.
+Steps:
+  1. CSMS sends GetReportRequest with a componentVariable entry that has no variable specified.
+  2. Charging Station responds.
+Expected result:
+  - Charging Station reports all variables of the specified component.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 9: componentVariable with variable but missing instance — report all instances of that variable
+Scenario: The variable is specified but the instance is missing.
+Steps:
+  1. CSMS sends GetReportRequest with a componentVariable where variable is present but variable.instance is missing.
+  2. Charging Station responds.
+Expected result:
+  - Charging Station reports for every instance of that variable on the component.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 10: requestId is echoed in all NotifyReportRequest messages
+Scenario: All notification parts must carry the same requestId.
+Steps:
+  1. CSMS sends GetReportRequest(requestId = 99).
+  2. Charging Station sends multiple NotifyReportRequest messages.
+Expected result:
+  - Every NotifyReportRequest contains requestId = 99.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 11: seqNo starts at 0 and increments per report part
+Scenario: Verify sequence numbering.
+Steps:
+  1. CSMS sends GetReportRequest.
+  2. Charging Station sends 3 NotifyReportRequest messages.
+Expected result:
+  - seqNo values: 0, 1, 2.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 12: Report contains variableCharacteristics
+Scenario: Every reported variable must include variableCharacteristics.
+Steps:
+  1. CSMS sends GetReportRequest with any valid criteria.
+  2. Charging Station responds with NotifyReportRequest messages.
+Expected result:
+  - Each reported variable in the NotifyReportRequest includes its variableCharacteristics.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 13: Criteria results in an empty result set
+Scenario: The combination of criteria matches no components on this Charging Station.
+Steps:
+  1. CSMS sends GetReportRequest with componentCriteria and/or componentVariables that match nothing.
+  2. Charging Station processes the request.
+Expected result:
+  - Charging Station responds with GetReportResponse(status = EmptyResultSet).
+  - No NotifyReportRequest messages are sent.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 14: Unsupported criteria
+Scenario: CSMS sends criteria that the Charging Station does not support.
+Steps:
+  1. CSMS sends GetReportRequest for unsupported criteria.
+  2. Charging Station processes the request.
+Expected result:
+  - Charging Station responds with GetReportResponse(status = NotSupported).
+  - No NotifyReportRequest messages are sent.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 15: Station is temporarily unable to process the report request
+Scenario: The Charging Station cannot execute the report at this time.
+Steps:
+  1. CSMS sends GetReportRequest.
+  2. Charging Station is temporarily busy or unable.
+Expected result:
+  - Charging Station responds with GetReportResponse(status = Rejected).
+  - No NotifyReportRequest messages are sent.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 16: Request exceeds ItemsPerMessageGetReport limit
+Scenario: The request contains more ComponentVariableType elements than allowed.
+Steps:
+  1. CSMS sends GetReportRequest with more componentVariables than ItemsPerMessageGetReport allows.
+  2. Charging Station processes the request.
+Expected result:
+  - Charging Station MAY respond with CALLERROR(OccurenceConstraintViolation).
+
+--------------------------------------------------------------------------------
+
+TEST CASE 17: Request message exceeds BytesPerMessageGetReport limit
+Scenario: The total byte size of the GetReportRequest exceeds the allowed limit.
+Steps:
+  1. CSMS sends a GetReportRequest whose byte length exceeds BytesPerMessageGetReport.
+  2. Charging Station processes the request.
+Expected result:
+  - Charging Station MAY respond with CALLERROR(FormatViolation).
+
+--------------------------------------------------------------------------------

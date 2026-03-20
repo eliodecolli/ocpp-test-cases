@@ -1,0 +1,198 @@
+B01 - Cold Boot Charging Station
+Table 35. B01 - Cold Boot Charging Station
+No. Type Description
+1 Name Cold Boot Charging Station
+2 ID B01
+Functional block B. Provisioning
+3 Objective(s) The objective of this use case is to enable a Charging Station that is powering up to register itself
+at a CSMS and provide the right state information.
+4 Description This use case describes how the CSMS can control which Charging Stations access it. To be able
+to control Charging Stations connecting to a CSMS, Charging Stations are required to send
+BootNotificationRequest. This request contains some general information about the Charging
+Station.
+Actors Charging Station, CSMS
+Scenario description 1. The Charging Station is powered up.
+2. The Charging Station sends BootNotificationRequest to the CSMS.
+3. The CSMS returns with BootNotificationResponse with the status Accepted.
+4. Optional: The Charging Station sends StatusNotificationRequest with status Unavailable to the
+CSMS for each Connector.
+5. The Charging Station sends StatusNotificationRequest to the CSMS for each Connector. If the
+status was set to Unavailable or Reserved from the CSMS prior to the (re)boot, the Connector
+should return to this status, otherwise the status should be Available or, when it resumes a
+transaction that was ongoing, the status should be Occupied.
+6. Normal operational is resumed.
+7. The Charging Station sends HeartbeatRequest to the CSMS.
+Alternative scenario(s) B01 - Cold Boot Charging Station - Requirements
+Table 36. B01 - Requirements
+ID Precondition Requirement definition Note
+B01.FR.01 After start-up. The Charging Station SHALL send
+BootNotificationRequest to the CSMS with
+information about its configuration.
+Information: e.g. version,
+vendor, etc.
+B01.FR.02 B01.FR.01
+The CSMS has received
+BootNotificationRequest from the
+Charging Station.
+The CSMS SHALL respond to indicate whether it
+will accept the Charging Station.
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 45/471 Part 2 - Specification
+ID Precondition Requirement definition Note
+B01.FR.03 After a reboot (for instance due to a
+remote reset command, power
+outage, firmware update, software
+error etc.)
+The Charging Station SHALL again connect to the
+CSMS and SHALL send a BootNotificationRequest
+each time it boots or reboots.
+B01.FR.04 When the CSMS responds with
+BootNotificationResponse with the
+status Accepted AND
+interval > 0
+The Charging Station SHALL adjust the heartbeat
+interval in accordance with the interval from the
+response message.
+B01.FR.05 When the CSMS responds with
+BootNotificationResponse with the
+status Accepted.
+The Charging Station SHALL send a
+StatusNotificationRequest for each Connector with
+its current state.
+B01.FR.06 The Charging Station has received
+BootNotificationResponse.
+AND
+Charging Station is configured to use
+Heartbeats for time synchronization
+TimeSource
+The Charging Station SHALL synchronize the
+Charging Station’s internal clock with the supplied
+CSMS’s current time.
+B01.FR.07 When a Charging Station or an EVSE is
+set to status Unavailable by a Change
+Availability command.
+The Unavailable status MUST be persistent across
+reboots.
+B01.FR.08 Between the physical power-
+on/reboot and the successful
+completion of a BootNotification,
+where the CSMS returns Accepted or
+Pending.
+The Charging Station SHALL NOT send any other
+OCPP requests to the CSMS (Except
+BootNotificationRequest). This includes cached
+OCPP messages that are still present in the
+Charging Station from prior sessions.
+Refer to B01 - Cold Boot Charging Station
+3 Objective(s) 1. To inform the Charging Station that it is not yet accepted by the CSMS: Pending status.
+2. To give the CSMS a way to retrieve or set certain configuration information.
+3. To give the CSMS a way of limiting the load on the CSMS after e.g. a reboot of the CSMS.
+4 Description This use case describes the behavior of the CSMS and a Charging Station when the Charging
+Station is informed by the CSMS that it is not yet accepted using the Pending status.
+Actors Charging Station, CSMS
+Scenario description 1. The Charging Station is powered up.
+2. The Charging Station sends BootNotificationRequest to the CSMS.
+3. The CSMS responds with BootNotificationResponse with the status Pending.
+4. The CSMS then, is able to send messages to the Charging Station in order to change the
+configuration of the Charging Station.
+5. The Charging Station resends BootNotificationRequest after the number of seconds indicated
+by the interval field. (Interval from BootNotificationResponse)
+5 Prerequisite(s) 1. The CSMS requires to set the Charging Station in Pending status.
+2. The Charging Station is starting up (i.e. powering up after being powered down).
+6 Postcondition(s) Successful postcondition:
+The Charging Station is in Pending status.
+Failure postcondition:
+The Charging Station received the status Rejected, B01 - Cold Boot Charging Station
+Figure 11. Sequence Diagram: Cold Boot Charging Station - Pending
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 47/471 Part 2 - Specification
+7 Error handling 1. When no initial connection established between CSMS and Charging Station: Retry Connection
+to the CSMS and resend BootNotificationRequest.
+2. No response / time-out from the CSMS: The Charging Station resends BootNotificationRequest
+after a waiting interval. This waiting interval can be based on the interval from a previous
+BootNotificationResponse or chosen by the Charging Station itself. In the latter case, the
+Charging Station chooses this interval in a way that avoids flooding the CSMS with requests.
+8 Remark(s) When the CSMS returns with BootNotificationResponse with the status Accepted, B01 - Cold Boot
+Charging Station applies.
+B01 - Cold Boot Charging Station
+3 Objective(s) To inform the Charging Station that its not (yet) accepted by the CSMS: Rejected status.
+4 Description This use case describes the behavior of the CSMS and a Charging Station, when the Charging
+Station is informed by the CSMS that it is not (yet) accepted using the Rejected status.
+Actors Charging Station, CSMS
+Scenario description 1. The Charging Station is powered up.
+2. The Charging Station sends BootNotificationRequest to the CSMS.
+3 The CSMS responds with BootNotificationResponse with the status Rejected to the Charging
+Station.
+4. The Charging Station will resend BootNotificationRequest after the number of seconds
+indicated by the interval field. (Interval from BootNotificationResponse).
+5 Prerequisite(s) 1. The CSMS requires to set the Charging Station in the Rejected status.
+2. The Charging Station is powered down.
+6 Postcondition(s) The Charging Station remains in the Rejected status.
+CSMS Charging Station
+BootNotificationRequest(...)
+BootNotificationResponse(status =Rejected, interval = X,...)
+loop[with interval X while "Rejected"]
+BootNotificationRequest(...)
+BootNotificationResponse(status =Rejected, interval = X,...)
+Continue B01 - Cold Boot Charging Station
+Figure 12. Sequence Diagram: Cold Boot Charging Station - Rejected
+7 Error handling When there is no response or a time-out from the CSMS: The Charging Station resends
+BootNotificationRequest after a waiting interval. This waiting interval can be based on the interval
+from a previous BootNotificationResponse or chosen by the Charging Station itself. In the latter
+case, the Charging Station chooses this interval in a way that avoids flooding the CSMS with
+requests.
+8 Remark(s) During the status Rejected, the Charging Station may no longer be reachable from the CSMS. The
+Charging Station MAY e.g. close its communication channel or shut down its communication
+hardware.
+Additionally, the CSMS MAY close the communication channel, for instance to free up system
+resources.
+It is advised not to accept any transactions until the BootNotification of the Charging Station has
+been accepted by the CSMS. See: Transactions before being accepted by a CSMS
+When the CSMS returns with BootNotificationResponse with the status Accepted, B01 - Cold Boot
+Charging Station applies.
+B01 - Cold Boot Charging Station
+Figure 20. Sequence Diagram: Reset Without Transaction
+7 Error handling n.a
+8 Remark(s) Persistent states: for example, EVSE set to Unavailable SHALL persist.
+The Charging Station responds with ResetResponse.
+B01 - Cold Boot Charging Station.
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 65/471 Part 2 - Specification
+ID Precondition Requirement definition
+B11.FR.05 If the status of an EVSE was Reserved. After a reboot of the Charging Station or EVSE, the EVSE(s)
+SHALL return to the state Reserved.
+B11.FR.06 B11.FR.01
+AND
+For example there is a firmware update ongoing
+that cannot be interrupted.
+The Charging Station SHALL respond with a status Rejected.
+B11.FR.07 B11.FR.01
+AND
+Charging Station cannot perform the reset now,
+but has scheduled the reset for later
+The Charging Station SHALL respond with a status Scheduled.
+B11.FR.08 B11.FR.01
+AND an evseId parameter is supplied
+AND
+ResetResponse was Accepted.
+The Charging Station MAY send a
+StatusNotification(Unavailable) for the EVSE and SHALL start a
+reboot of EVSE that is referred to by evseId parameter.
+B11.FR.09 B11.FR.01
+AND an evseId parameter is supplied
+AND
+Charging Station does not support resetting an
+individual EVSE
+The Charging Station SHALL return a ResetResponse Rejected
+B11.FR.10 When the Charging Station supports resetting of
+an individual EVSE
+The Charging Station SHOULD set the device model variable
+AllowReset to true for the EVSE.
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 66/471 Part 2 - Specification
+B01 - Cold Boot Charging Station applies.
+Alternative scenario(s) B01 - Cold Boot Charging Station
+Figure 21. Sequence Diagram: Reset With Ongoing Transaction
+7 Error handling After having accepted the ResetRequest, TransactionEventRequest messages that cannot be
+delivered to the CSMS MUST be queued.
+8 Remark(s) n/a

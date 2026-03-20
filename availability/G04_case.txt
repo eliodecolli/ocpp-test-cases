@@ -1,0 +1,171 @@
+G04 - Change Availability Charging Station
+Test Cases
+================================================================================
+
+TC-G04-001
+Title: Charging Station responds to ChangeAvailabilityRequest
+Requirement: G04.FR.02
+Steps:
+  1. CSMS sends a ChangeAvailabilityRequest to the Charging Station, targeting a specific EVSE with
+     a valid availability type (Operative or Inoperative).
+  2. Observe the Charging Station's response.
+Expected Result:
+  The Charging Station sends a ChangeAvailabilityResponse message back to the CSMS.
+  The response is received within the protocol timeout window.
+  No other message is sent in place of ChangeAvailabilityResponse.
+
+--------------------------------------------------------------------------------
+
+TC-G04-002
+Title: ChangeAvailabilityResponse indicates whether the change can be performed
+Requirement: G04.FR.03
+Steps:
+  1. CSMS sends a ChangeAvailabilityRequest targeting an EVSE that has no ongoing transaction,
+     requesting a change to Inoperative.
+  2. Observe the status field in the ChangeAvailabilityResponse.
+Expected Result:
+  The ChangeAvailabilityResponse contains a status field.
+  The status field value is one of the valid AvailabilityStatusEnumType values (Accepted, Rejected,
+  or Scheduled), indicating whether the Charging Station is able to perform the requested change.
+  The status is not absent or null.
+
+--------------------------------------------------------------------------------
+
+TC-G04-003
+Title: Availability change accepted when no transaction is in progress
+Requirement: G04.FR.03, G04.FR.05
+Steps:
+  1. Ensure no transaction is ongoing on the target EVSE.
+  2. CSMS sends a ChangeAvailabilityRequest targeting that EVSE with type set to Inoperative.
+  3. Observe the ChangeAvailabilityResponse.
+  4. Observe subsequent StatusNotificationRequest messages from the Charging Station.
+Expected Result:
+  The ChangeAvailabilityResponse has status = Accepted.
+  The Charging Station sends a StatusNotificationRequest for each connector of the targeted EVSE.
+  Each StatusNotificationRequest contains: evseId matching the targeted EVSE, connectorId
+  identifying the respective connector, and connectorStatus = Unavailable.
+  A StatusNotificationResponse is returned by the CSMS for each StatusNotificationRequest.
+
+--------------------------------------------------------------------------------
+
+TC-G04-004
+Title: Availability change is Scheduled when a transaction is ongoing
+Requirement: G04.FR.06
+Steps:
+  1. Ensure a transaction is actively in progress on the target EVSE.
+  2. CSMS sends a ChangeAvailabilityRequest targeting that EVSE with type set to Inoperative.
+  3. Observe the ChangeAvailabilityResponse.
+Expected Result:
+  The ChangeAvailabilityResponse has status = Scheduled.
+  No StatusNotificationRequest is sent immediately.
+  The Charging Station waits for the ongoing transaction to finish before applying the availability
+  change.
+
+--------------------------------------------------------------------------------
+
+TC-G04-005
+Title: StatusNotification sent after transaction ends following a Scheduled change
+Requirement: G04.FR.05, G04.FR.06
+Steps:
+  1. Ensure a transaction is actively in progress on the target EVSE.
+  2. CSMS sends a ChangeAvailabilityRequest targeting that EVSE with type set to Inoperative.
+  3. Confirm the Charging Station responds with status = Scheduled.
+  4. Allow the ongoing transaction to complete (e.g., vehicle disconnects or session is stopped).
+  5. Observe messages sent by the Charging Station after the transaction ends.
+Expected Result:
+  After the transaction finishes, the Charging Station sends a StatusNotificationRequest for each
+  connector of the previously targeted EVSE.
+  Each StatusNotificationRequest contains: evseId matching the targeted EVSE, connectorId for
+  the respective connector, and connectorStatus = Unavailable.
+  The CSMS responds with StatusNotificationResponse for each notification.
+
+--------------------------------------------------------------------------------
+
+TC-G04-006
+Title: Request to change to the same availability state returns Accepted
+Requirement: G04.FR.04
+Steps:
+  1. Set a specific EVSE to Inoperative via a ChangeAvailabilityRequest and confirm it is applied.
+  2. CSMS sends another ChangeAvailabilityRequest for the same EVSE with type = Inoperative
+     (same state it is already in).
+  3. Observe the ChangeAvailabilityResponse.
+Expected Result:
+  The ChangeAvailabilityResponse has status = Accepted.
+  The Charging Station does not reject the request simply because the state is unchanged.
+
+--------------------------------------------------------------------------------
+
+TC-G04-007
+Title: Omitting the evse field applies the availability change to the whole Charging Station
+Requirement: G04.FR.01
+Steps:
+  1. CSMS sends a ChangeAvailabilityRequest with the evse field omitted (no EVSE ID specified)
+     and type set to Inoperative.
+  2. Observe the ChangeAvailabilityResponse.
+  3. Observe subsequent StatusNotificationRequest messages.
+Expected Result:
+  The ChangeAvailabilityResponse is received with a valid status (Accepted or Scheduled).
+  The availability change is applied to the entire Charging Station, not just a single EVSE.
+  StatusNotificationRequest messages are sent for connectors across all EVSEs of the Charging
+  Station, each reporting the new connectorStatus.
+
+--------------------------------------------------------------------------------
+
+TC-G04-008
+Title: All operative EVSEs and connectors become Unavailable when Charging Station goes Inoperative
+Requirement: G04.FR.07
+Steps:
+  1. Ensure multiple EVSEs and connectors are in an operative state (Available, Occupied, or
+     Reserved) and none are Faulted.
+  2. CSMS sends a ChangeAvailabilityRequest with type = Inoperative targeting the whole Charging
+     Station (evse field omitted).
+  3. Allow any ongoing transactions to complete (if status was Scheduled).
+  4. Observe StatusNotificationRequest messages for all connectors.
+Expected Result:
+  Every connector that was operative (not Faulted) receives a StatusNotificationRequest with
+  connectorStatus = Unavailable.
+  Connectors that were already Faulted are not changed to Unavailable (they remain Faulted).
+  A StatusNotificationResponse is returned by the CSMS for each StatusNotificationRequest.
+
+--------------------------------------------------------------------------------
+
+TC-G04-009
+Title: EVSEs and connectors revert to original status when Charging Station becomes Operative
+Requirement: G04.FR.08
+Steps:
+  1. Record the current status of all EVSEs and connectors on the Charging Station.
+  2. CSMS sends a ChangeAvailabilityRequest with type = Inoperative for the whole Charging Station.
+  3. Confirm all operative connectors have transitioned to Unavailable via StatusNotificationRequest
+     messages.
+  4. CSMS sends a ChangeAvailabilityRequest with type = Operative for the whole Charging Station.
+  5. Observe StatusNotificationRequest messages after the second change.
+Expected Result:
+  After the Operative change is applied, the Charging Station sends StatusNotificationRequest
+  messages for each connector.
+  Each connector's connectorStatus reverts to the status it held before the Inoperative change
+  was applied (e.g., Available, Occupied, or Reserved as appropriate).
+  Connectors that were individually set to Inoperative before the station-wide change remain
+  Inoperative (per Note 1: individual states are maintained independently).
+
+--------------------------------------------------------------------------------
+
+TC-G04-010
+Title: Availability state persists across a reboot or power loss
+Requirement: G04.FR.09
+Steps:
+  1. CSMS sends a ChangeAvailabilityRequest setting a specific EVSE to Inoperative.
+  2. Confirm the Charging Station responds with status = Accepted and sends the corresponding
+     StatusNotificationRequest messages showing Unavailable.
+  3. Simulate a Charging Station reboot or power cycle (e.g., via a reset command or physical
+     power interruption).
+  4. After the Charging Station reconnects to the CSMS and completes its boot sequence, observe
+     the status reported for the affected EVSE's connectors.
+Expected Result:
+  After the reboot, the EVSE that was set to Inoperative remains in the Unavailable state.
+  The Charging Station sends StatusNotificationRequest messages after boot-up that show
+  connectorStatus = Unavailable for the previously Inoperative EVSE's connectors.
+  The availability state was not reset to a default operative state by the reboot.
+
+================================================================================
+END OF TEST CASES
+================================================================================

@@ -1,0 +1,375 @@
+C08 - Test Cases: Authorization at EVSE using ISO 15118 External Identification Means (EIM)
+==========================================================================================
+
+Protocol Summary
+----------------
+This protocol describes how an Electric Vehicle (EV) is authorized at a Charging Station (EVSE)
+using External Identification Means (EIM) as defined in ISO 15118. The Charging Station sends an
+AuthorizeRequest to the CSMS (Charge Point Management System) containing the EIM-based idToken.
+The CSMS validates the token and responds with an AuthorizeResponse. A key scenario is when the
+Charging Station is offline and the presented idToken is unknown (not in Authorization Cache or
+Local Authorization List) - in this case, whether the identifier is accepted or rejected depends
+on the configuration flag OfflineTxForUnknownIdEnabled.
+
+Actors: EV (and EV Driver), Charging Station, CSMS
+
+==========================================================================================
+
+TEST CASE 01 - Happy Path: Successful EIM Authorization While Online
+----------------------------------------------------------------------
+Title:
+  Online EIM Authorization - Token Accepted by CSMS
+
+Scenario:
+  The Charging Station is online and connected to the CSMS. The EV Driver presents a valid EIM
+  (e.g., an RFID card or eMAID from an ISO 15118 contract certificate). The CSMS recognizes and
+  accepts the token.
+
+Steps:
+  1. Ensure the Charging Station is online and communicating with the CSMS.
+  2. Connect the EV to the Charging Station (EVSE).
+  3. The EV Driver presents the EIM within the required time after connecting.
+  4. The Charging Station reads the EIM and constructs an AuthorizeRequest containing the idToken.
+  5. The Charging Station sends the AuthorizeRequest to the CSMS.
+  6. The CSMS validates the idToken and responds with an AuthorizeResponse.
+  7. Observe the authorization status returned in the subsequent TransactionEventResponse.
+
+Expected Result:
+  The CSMS returns an AuthorizeResponse indicating the token is valid.
+  The authorization status in the TransactionEventResponse is "Accepted".
+  Charging proceeds normally.
+
+
+TEST CASE 02 - Happy Path: Successful EIM Authorization Using eMAID from Contract Certificate
+----------------------------------------------------------------------------------------------
+Title:
+  Online EIM Authorization - eMAID from ISO 15118 Contract Certificate Accepted
+
+Scenario:
+  The EV presents an eMAID (e-Mobility Account Identifier) as part of an ISO 15118 contract
+  certificate. The Charging Station extracts this as the EIM and sends it for authorization.
+  The CSMS accepts it.
+
+Steps:
+  1. Ensure the Charging Station is online.
+  2. Connect the EV to the Charging Station. The EV uses ISO 15118 communication and presents its
+     contract certificate containing an eMAID.
+  3. The EV Driver activates authorization within the required time period.
+  4. The Charging Station extracts the eMAID from the contract certificate and uses it as the
+     idToken in an AuthorizeRequest.
+  5. The Charging Station sends the AuthorizeRequest to the CSMS.
+  6. The CSMS validates the eMAID-based idToken and returns an AuthorizeResponse.
+
+Expected Result:
+  The CSMS accepts the eMAID. The authorization status in the TransactionEventResponse is
+  "Accepted". This confirms the remark that the protocol applies to eMAIDs presented via ISO
+  15118 contract certificates.
+
+
+TEST CASE 03 - Happy Path: Offline Authorization with Unknown Token - OfflineTxForUnknownIdEnabled = True
+----------------------------------------------------------------------------------------------------------
+Title:
+  Offline Authorization - Unknown Token Accepted Due to OfflineTxForUnknownIdEnabled = True
+
+Scenario:
+  The Charging Station is offline (no connection to CSMS). The EV Driver presents an EIM that is
+  not found in the Authorization Cache or the Local Authorization List. The configuration flag
+  OfflineTxForUnknownIdEnabled is set to True.
+
+Steps:
+  1. Ensure the Charging Station is offline (disconnected from CSMS).
+  2. Ensure the presented idToken is not stored in the Authorization Cache.
+  3. Ensure the presented idToken is not stored in the Local Authorization List (or the list is
+     not implemented/enabled).
+  4. Ensure OfflineTxForUnknownIdEnabled is set to True on the Charging Station.
+  5. Connect the EV to the Charging Station.
+  6. The EV Driver presents the EIM within the required time.
+  7. The Charging Station checks the Authorization Cache - token not found.
+  8. The Charging Station checks the Local Authorization List - token not found.
+  9. Because OfflineTxForUnknownIdEnabled = True, the Charging Station accepts the identifier.
+  10. An optional notification may be displayed to the EV Driver.
+
+Expected Result:
+  The unknown token is accepted despite the Charging Station being offline.
+  The authorization status in the TransactionEventResponse is "Accepted".
+  Charging proceeds. An optional notification may be issued.
+
+
+TEST CASE 04 - Failure Scenario: Offline Authorization with Unknown Token - OfflineTxForUnknownIdEnabled = False
+-----------------------------------------------------------------------------------------------------------------
+Title:
+  Offline Authorization - Unknown Token Rejected Due to OfflineTxForUnknownIdEnabled = False
+
+Scenario:
+  The Charging Station is offline. The EV Driver presents an EIM that is not found in the
+  Authorization Cache or the Local Authorization List. The configuration flag
+  OfflineTxForUnknownIdEnabled is set to False.
+
+Steps:
+  1. Ensure the Charging Station is offline.
+  2. Ensure the presented idToken is not stored in the Authorization Cache.
+  3. Ensure the presented idToken is not stored in the Local Authorization List.
+  4. Ensure OfflineTxForUnknownIdEnabled is set to False on the Charging Station.
+  5. Connect the EV to the Charging Station.
+  6. The EV Driver presents the EIM within the required time.
+  7. The Charging Station checks the Authorization Cache - token not found.
+  8. The Charging Station checks the Local Authorization List - token not found.
+  9. Because OfflineTxForUnknownIdEnabled = False, the Charging Station rejects the identifier.
+  10. An optional notification may be displayed to the EV Driver.
+
+Expected Result:
+  The unknown token is rejected.
+  The authorization status in the TransactionEventResponse is NOT "Accepted".
+  Charging does not proceed. An optional notification may be issued to the driver.
+
+
+TEST CASE 05 - Happy Path: Offline Authorization - Token Found in Authorization Cache
+--------------------------------------------------------------------------------------
+Title:
+  Offline Authorization - Known Token Accepted via Authorization Cache
+
+Scenario:
+  The Charging Station is offline. The EV Driver presents an EIM that IS found in the
+  Authorization Cache (previously cached from an earlier online session).
+
+Steps:
+  1. Ensure the Charging Station is offline.
+  2. Ensure Authorization Cache is enabled and contains a valid entry for the idToken to be
+     presented.
+  3. Connect the EV to the Charging Station.
+  4. The EV Driver presents the EIM within the required time.
+  5. The Charging Station checks the Authorization Cache - token is found with a valid status.
+  6. The Charging Station accepts the identifier based on the cache entry.
+
+Expected Result:
+  The token is accepted using the cached authorization data.
+  The authorization status in the TransactionEventResponse is "Accepted".
+  Charging proceeds without needing CSMS communication.
+
+
+TEST CASE 06 - Happy Path: Offline Authorization - Token Found in Local Authorization List
+--------------------------------------------------------------------------------------------
+Title:
+  Offline Authorization - Known Token Accepted via Local Authorization List
+
+Scenario:
+  The Charging Station is offline. The Local Authorization List is implemented and enabled. The
+  EV Driver presents an EIM that is present in the Local Authorization List with an accepted
+  status.
+
+Steps:
+  1. Ensure the Charging Station is offline.
+  2. Ensure the Local Authorization List is implemented, enabled, and contains a valid entry for
+     the idToken to be presented.
+  3. Connect the EV to the Charging Station.
+  4. The EV Driver presents the EIM within the required time.
+  5. The Charging Station checks the Authorization Cache (if enabled) - token not found or cache
+     not enabled.
+  6. The Charging Station checks the Local Authorization List - token is found with an accepted
+     status.
+  7. The Charging Station accepts the identifier.
+
+Expected Result:
+  The token is accepted using the Local Authorization List.
+  The authorization status in the TransactionEventResponse is "Accepted".
+  Charging proceeds without needing CSMS communication.
+
+
+TEST CASE 07 - Failure Scenario: CSMS Rejects the EIM Token
+-------------------------------------------------------------
+Title:
+  Online Authorization - CSMS Returns Rejected Status for EIM Token
+
+Scenario:
+  The Charging Station is online. The EV Driver presents an EIM, but the CSMS determines the
+  token is invalid, expired, blocked, or not recognized.
+
+Steps:
+  1. Ensure the Charging Station is online.
+  2. Connect the EV to the Charging Station.
+  3. The EV Driver presents the EIM within the required time.
+  4. The Charging Station sends an AuthorizeRequest with the idToken to the CSMS.
+  5. The CSMS validates the token and determines it is not authorized (e.g., expired, blocked,
+     or unknown).
+  6. The CSMS returns an AuthorizeResponse with a status other than Accepted (e.g., Invalid,
+     Blocked, Unknown, or NotAllowedTypeEVSEID).
+
+Expected Result:
+  The authorization status returned is not "Accepted".
+  The Charging Station does not allow charging to begin.
+  An appropriate response or notification is provided to the EV Driver.
+
+
+TEST CASE 08 - Edge Case: EV Driver Does Not Activate Authorization Within Required Time
+-----------------------------------------------------------------------------------------
+Title:
+  Authorization Timeout - EV Driver Fails to Present EIM in Time
+
+Scenario:
+  The EV is connected to the Charging Station, but the EV Driver does not activate authorization
+  (present the EIM) within the required time window. This tests requirement C08.FR.02.
+
+Steps:
+  1. Ensure the Charging Station is powered and ready.
+  2. Connect the EV to the Charging Station.
+  3. Allow the authorization time window to expire without the EV Driver presenting any EIM.
+  4. Observe the behavior of the Charging Station.
+
+Expected Result:
+  The Charging Station does not send an AuthorizeRequest (no token was presented).
+  Depending on the implementation, the EVSE may display an HMI prompt allowing the EV Driver to
+  restart the identification process (as required by C08.FR.02), or the session attempt is
+  abandoned. Charging does not commence.
+
+
+TEST CASE 09 - Edge Case: HMI Restart of Identification Process After Initial Failure
+--------------------------------------------------------------------------------------
+Title:
+  Authorization Restart via EVSE HMI After Timeout or Failed Identification
+
+Scenario:
+  The EV Driver misses the initial authorization window or the first identification attempt
+  fails. The Charging Station provides an HMI option to restart the identification process,
+  as required by C08.FR.02.
+
+Steps:
+  1. Connect the EV to the Charging Station.
+  2. Allow the initial authorization window to expire without a valid EIM being presented, or
+     simulate a failed identification attempt.
+  3. The Charging Station presents an HMI prompt or button allowing the EV Driver to restart
+     identification.
+  4. The EV Driver activates the restart via the HMI.
+  5. The EV Driver presents the EIM.
+  6. The Charging Station sends an AuthorizeRequest to the CSMS (if online) or checks local
+     sources (if offline).
+  7. The CSMS or local check returns an accepted status.
+
+Expected Result:
+  The HMI restart option is available after the initial window.
+  After the EV Driver uses the restart option and presents the EIM, authorization succeeds.
+  The authorization status in the TransactionEventResponse is "Accepted".
+  Charging proceeds.
+
+
+TEST CASE 10 - Edge Case: Authorization Cache Disabled, Local Authorization List Disabled - Offline with Unknown Token
+-----------------------------------------------------------------------------------------------------------------------
+Title:
+  Offline Authorization - No Cache, No Local List, Unknown Token, Flag = True
+
+Scenario:
+  The Charging Station is offline. Neither the Authorization Cache nor the Local Authorization
+  List is enabled. The presented token is unknown. OfflineTxForUnknownIdEnabled = True.
+
+Steps:
+  1. Ensure the Charging Station is offline.
+  2. Disable the Authorization Cache.
+  3. Disable or confirm the Local Authorization List is not implemented/enabled.
+  4. Set OfflineTxForUnknownIdEnabled to True.
+  5. Connect the EV to the Charging Station.
+  6. The EV Driver presents an EIM that would not be recognized by the CSMS.
+  7. The Charging Station finds no cache and no local list to consult.
+  8. Because OfflineTxForUnknownIdEnabled = True, the Charging Station accepts the identifier.
+
+Expected Result:
+  The token is accepted offline despite the absence of local verification mechanisms.
+  The authorization status in the TransactionEventResponse is "Accepted".
+  Charging proceeds.
+
+
+TEST CASE 11 - Edge Case: Authorization Cache Disabled, Local Authorization List Disabled - Offline with Unknown Token, Flag = False
+-------------------------------------------------------------------------------------------------------------------------------------
+Title:
+  Offline Authorization - No Cache, No Local List, Unknown Token, Flag = False
+
+Scenario:
+  The Charging Station is offline. Neither the Authorization Cache nor the Local Authorization
+  List is enabled. The presented token is unknown. OfflineTxForUnknownIdEnabled = False.
+
+Steps:
+  1. Ensure the Charging Station is offline.
+  2. Disable the Authorization Cache.
+  3. Disable or confirm the Local Authorization List is not implemented/enabled.
+  4. Set OfflineTxForUnknownIdEnabled to False.
+  5. Connect the EV to the Charging Station.
+  6. The EV Driver presents an EIM.
+  7. The Charging Station finds no cache and no local list to consult.
+  8. Because OfflineTxForUnknownIdEnabled = False, the Charging Station rejects the identifier.
+
+Expected Result:
+  The token is rejected.
+  The authorization status in the TransactionEventResponse is NOT "Accepted".
+  Charging does not proceed.
+
+
+TEST CASE 12 - Edge Case: Sending the Identification to CSMS (Requirement C08.FR.01)
+--------------------------------------------------------------------------------------
+Title:
+  AuthorizeRequest Always Sent to CSMS When Online
+
+Scenario:
+  Regardless of whether the EIM token is already known locally, when the Charging Station is
+  online it must send the identification to the CSMS for validation, as required by C08.FR.01.
+
+Steps:
+  1. Ensure the Charging Station is online.
+  2. (Optional) Pre-populate the Authorization Cache or Local Authorization List with the
+     idToken to be presented, to confirm that even a locally known token is still forwarded.
+  3. Connect the EV to the Charging Station.
+  4. The EV Driver presents the EIM.
+  5. Observe whether the Charging Station sends an AuthorizeRequest to the CSMS.
+
+Expected Result:
+  The Charging Station sends an AuthorizeRequest to the CSMS containing the EIM-based idToken.
+  The CSMS responds with an AuthorizeResponse.
+  The Charging Station does not bypass CSMS validation when online, even if the token exists
+  locally.
+
+
+TEST CASE 13 - Edge Case: Charging Station Transitions from Offline to Online During Session
+----------------------------------------------------------------------------------------------
+Title:
+  Connectivity Restored After Offline Token Acceptance
+
+Scenario:
+  The Charging Station accepted an unknown token offline (OfflineTxForUnknownIdEnabled = True)
+  and a session began. The Charging Station subsequently regains connectivity to the CSMS.
+  Observe how the system handles the outstanding transaction.
+
+Steps:
+  1. Start with the Charging Station offline.
+  2. The EV Driver presents an EIM that is unknown locally.
+  3. OfflineTxForUnknownIdEnabled = True, so the session is accepted and starts.
+  4. While the session is in progress, restore network connectivity to the CSMS.
+  5. Observe whether the Charging Station reports the transaction and sends any pending messages
+     to the CSMS.
+
+Expected Result:
+  Once online, the Charging Station forwards any queued transaction events to the CSMS.
+  The CSMS receives the transaction information and can process or flag the unknown token as
+  appropriate. The session that was accepted offline is properly recorded.
+
+
+TEST CASE 14 - Failure Scenario: EIM Token Presented But AuthorizeRequest Not Sent
+------------------------------------------------------------------------------------
+Title:
+  Missing AuthorizeRequest - Charging Station Fails to Forward EIM to CSMS
+
+Scenario:
+  This is a negative/compliance test. The Charging Station is online, the EV presents an EIM,
+  but due to a malfunction or misconfiguration the Charging Station does not send the
+  AuthorizeRequest to the CSMS (violating requirement C08.FR.01).
+
+Steps:
+  1. Ensure the Charging Station is online.
+  2. Simulate or configure a condition where the Charging Station will not send an
+     AuthorizeRequest (e.g., a fault or bypass).
+  3. Connect the EV to the Charging Station.
+  4. The EV Driver presents the EIM.
+  5. Monitor CSMS logs to confirm whether an AuthorizeRequest was received.
+
+Expected Result:
+  This is the FAILING case. No AuthorizeRequest is observed at the CSMS.
+  This represents a protocol violation of C08.FR.01.
+  The system should detect and flag this as a non-compliant behavior.
+  In a correct implementation, the AuthorizeRequest MUST always be sent when the Charging
+  Station is online.

@@ -1,0 +1,121 @@
+E04 - Offline Start Transaction
+E04 - Transaction started while Charging Station is offline
+Table 102. E04 - Transaction started while Charging Station is offline
+No. Type Description
+1 Name Transaction started while Charging Station is offline
+2 ID E04
+Functional block E. Transactions
+3 Objective(s) To enable the EV Driver to start a transaction while the Charging Station is Offline.
+4 Description This use case covers how the Charging Station, while Offline, is able to start a transaction using
+the Local Authorization List or the Authorization Cache.
+Actors Charging Station, CSMS, EV Driver
+Scenario description 1. The transaction starts.
+2. The TransactionEventRequest (eventType = Started) is stored/queued by the Charging Station.
+3. The connection between Charging Station and CSMS is restored.
+4. The Charging Station starts to send queued messages
+5. The stored TransactionEventRequest is sent, notifying the CSMS about the transaction that
+was started.
+Alternative scenario(s) E04 - Transaction started while Charging Station is offline - Requirements
+Table 103. E04 - Requirements
+ID Precondition Requirement definition Note
+E04.FR.01 When Offline. The Charging Station MUST queue any
+TransactionEventRequest messages.
+E04.FR.02 After the connection is restored. The Charging Station MUST send queued
+TransactionEventRequest messages.
+E04.FR.03 E04.FR.02 The flag: "offline" SHALL be set to TRUE for any
+TransactionEventRequest that occurred while the
+Charging Station was offline.
+E04.FR.04 When a TransactionEventRequest has
+to be created
+The Charging Station SHALL set the message’s
+seqNo field as specified in Sequence Number
+Generation.
+This enables the CSMS
+to track the
+completeness of
+transaction information
+E04.FR.05 When configured to send meter data
+in the TransactionEventRequest
+(eventType = Started), See: Meter
+Values - Configuration
+AND
+EVSE is known at start of transaction
+The Charging Station SHALL add the configured
+measurands to the optional meterValue field with
+context = Transaction.Begin in the
+TransactionEventRequest(eventType = Started)
+sent to the CSMS to provide more details during the
+transaction.
+E04.FR.06 When configured to send meter data
+in the TransactionEventRequest
+(eventType = Updated), See: Meter
+Values - Configuration
+The Charging Station SHALL add the configured
+measurands to the optional meterValue field in the
+TransactionEventRequest(eventType = Updated)
+sent to the CSMS to provide more details during the
+transaction.
+E04.FR.07 E04.FR.06
+AND
+Offline
+AND
+The Charging Station is running low on
+memory
+The Charging Station MAY drop
+TransactionEventRequest(eventType = Updated)
+messages.
+E04.FR.08 E04.FR.07 When dropping TransactionEventRequest
+(eventType = Updated) messages, the Charging
+Station SHALL drop intermediate messages first
+(1st message, 3th message, 5th message etc.), not
+start dropping messages from the start or stop
+adding messages to the queue.
+E04.FR.09 E04.FR.06
+AND
+Amount of meter data is too much for
+1 TransactionEventRequest
+(eventType = Updated)
+The Charging Station MAY split meter data over
+multiple TransactionEventRequest(eventType =
+Updated) messages with the same timestamp.
+E04.FR.10 SampledDataSignReadings is true The Charging Station SHALL retrieve signed meter
+values and put them in the signedMeterValue field
+of sampledValues.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 137/471 Part 2 - Specification
+ID Precondition Requirement definition Note
+E04.FR.11 When configured to send meter data
+in the TransactionEventRequest
+(eventType = Started), See: Meter
+Values - Configuration
+AND
+EVSE is not known at start of
+transaction
+The Charging Station SHALL add the measurands
+for eventType = Started to the optional
+meterValue field with context =
+Transaction.Begin in the
+TransactionEventRequest(eventType = Updated)
+that occurs when charging starts.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 138/471 Part 2 - Specification
+E04 - Offline Start Transaction
+5 Prerequisite(s) Transaction ongoing and connection lost.
+6 Postcondition(s) Successful postcondition:
+The Charging Station resumes regular communication.
+Failure postcondition:
+n/a
+Charging StationCSMS
+A transaction is ongoing.
+Connection loss.
+opt
+loop[while transaction running]
+store TransactionEventRequest() messages
+Connection restored.
+loop[for all stored TransactionEventRequest() messages]
+TransactionEventRequest(offline = true)
+TransactionEventResponse()
+Resume regular communication
+Figure 61. Sequence Diagram: Connection Loss During Transaction
+7 Error handling n/a
+8 Remark(s) n/a

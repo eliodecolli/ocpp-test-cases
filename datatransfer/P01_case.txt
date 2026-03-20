@@ -1,0 +1,113 @@
+P01 - Data Transfer to the Charging Station
+Test Cases
+================================================================================
+
+TC-P01-001
+Title: CSMS sends DataTransferRequest only for non-OCPP functions
+Requirement: P01.FR.01
+Steps:
+  1. Identify a function that is natively supported by OCPP (e.g., ChangeConfiguration).
+  2. Attempt to trigger the CSMS or Charging Station to send a DataTransferRequest carrying that OCPP-native function.
+  3. Observe whether a DataTransferRequest is sent.
+Expected Result:
+  The system does NOT send a DataTransferRequest for any function that is already supported by OCPP.
+  No DataTransferRequest message appears on the wire for the OCPP-native function.
+  If the system enforces this requirement, an error or rejection is raised before the message is transmitted.
+
+--------------------------------------------------------------------------------
+
+TC-P01-002
+Title: vendorId follows reversed DNS namespace convention
+Requirement: P01.FR.02
+Steps:
+  1. Configure the CSMS to send a DataTransferRequest to the Charging Station.
+  2. Set the vendorId field to a value derived from a publicly registered DNS name in reversed form (e.g., "com.example.vendor").
+  3. Send the DataTransferRequest.
+  4. Inspect the vendorId field of the DataTransferRequest as received by the Charging Station.
+Expected Result:
+  The vendorId field in the received DataTransferRequest contains the reversed DNS namespace value (e.g., "com.example.vendor").
+  The top-level domain segment of the vendorId, when re-reversed, corresponds to a publicly registered primary DNS name of the vendor.
+  The Charging Station receives the DataTransferRequest without error related to vendorId format.
+
+--------------------------------------------------------------------------------
+
+TC-P01-003
+Title: messageId field is optional and used to indicate a specific message or implementation
+Requirement: P01.FR.03
+Steps:
+  1. Configure the CSMS to send a DataTransferRequest without a messageId field.
+  2. Send the DataTransferRequest and observe the Charging Station response.
+  3. Configure the CSMS to send a second DataTransferRequest with a messageId field set to a specific string (e.g., "SetDisplayMessage").
+  4. Send the second DataTransferRequest and observe the Charging Station response.
+Expected Result:
+  Step 2: The Charging Station receives and processes the DataTransferRequest successfully without a messageId; the DataTransferResponse is returned with status Accepted (or per vendor agreement) and no error is raised due to the absence of messageId.
+  Step 4: The Charging Station receives the DataTransferRequest with the messageId field present and containing the specified string; the DataTransferResponse is returned; the messageId value is preserved as sent.
+  In both cases the protocol does not mandate presence of messageId — absence must not cause a protocol-level error.
+
+--------------------------------------------------------------------------------
+
+TC-P01-004
+Title: Data length in request and response is agreed upon by parties involved
+Requirement: P01.FR.04
+Steps:
+  1. Establish a vendor-specific agreement between the CSMS and the Charging Station specifying a maximum data length (e.g., 512 bytes).
+  2. Send a DataTransferRequest from the CSMS with a data field whose length matches the agreed maximum.
+  3. Observe the DataTransferResponse returned by the Charging Station, noting the data field if present.
+  4. Send a DataTransferRequest with a data field whose length exceeds the agreed maximum.
+  5. Observe the system behavior.
+Expected Result:
+  Step 3: The Charging Station accepts the DataTransferRequest; the DataTransferResponse is returned; the data field length in both the request and response conforms to the agreed limit.
+  Step 5: The behavior when data length exceeds the agreed limit is governed by the vendor-specific agreement; the protocol itself does not prescribe a specific error, but the outcome (acceptance, rejection, or truncation) matches the pre-agreed terms.
+  The protocol does not define a fixed maximum data length; no standard OCPP error is raised solely due to data length.
+
+--------------------------------------------------------------------------------
+
+TC-P01-005
+Title: Recipient returns UnknownVendor when vendorId is not implemented
+Requirement: P01.FR.05
+Steps:
+  1. Configure the CSMS to send a DataTransferRequest with a vendorId value that has no corresponding implementation on the Charging Station (e.g., "com.unknownvendor.test").
+  2. Send the DataTransferRequest to the Charging Station.
+  3. Observe the DataTransferResponse returned by the Charging Station.
+Expected Result:
+  The Charging Station returns a DataTransferResponse with status set to UnknownVendor.
+  No other status value (Accepted, Rejected, UnknownMessageId) is used.
+  The response is sent promptly upon receipt of the DataTransferRequest.
+  The data field in the response MAY be absent or populated per vendor agreement, but the status field MUST be UnknownVendor.
+
+--------------------------------------------------------------------------------
+
+TC-P01-006
+Title: Recipient returns UnknownMessageId on messageId mismatch
+Requirement: P01.FR.06
+Steps:
+  1. Configure the CSMS to send a DataTransferRequest with a vendorId that IS implemented on the Charging Station.
+  2. Set the messageId field to a value that does not match any known message identifier for that vendorId on the Charging Station (e.g., "InvalidMessageId_XYZ").
+  3. Send the DataTransferRequest to the Charging Station.
+  4. Observe the DataTransferResponse returned by the Charging Station.
+Expected Result:
+  The Charging Station returns a DataTransferResponse with status set to UnknownMessageId.
+  No other status value (Accepted, Rejected, UnknownVendor) is used.
+  The response is sent upon receipt of the DataTransferRequest, reflecting detection of the messageId mismatch.
+  The data field in the response MAY be absent or populated per vendor agreement, but the status field MUST be UnknownMessageId.
+
+--------------------------------------------------------------------------------
+
+TC-P01-007
+Title: Usage of status Accepted or Rejected and data element governed by vendor-specific agreement
+Requirement: P01.FR.07
+Steps:
+  1. Establish a vendor-specific agreement between the CSMS and Charging Station specifying that: (a) status Accepted is returned when the request is successfully processed, (b) status Rejected is returned when the request is received but the contained request is rejected, and (c) the data element in the response carries a specific payload on rejection.
+  2. Send a DataTransferRequest that satisfies the conditions for Accepted per the agreement.
+  3. Observe the DataTransferResponse.
+  4. Send a DataTransferRequest that satisfies the conditions for Rejected per the agreement.
+  5. Observe the DataTransferResponse.
+Expected Result:
+  Step 3: The DataTransferResponse contains status Accepted and the data field (if specified by the agreement) contains the agreed payload.
+  Step 5: The DataTransferResponse contains status Rejected and the data field contains the agreed rejection payload as specified by the vendor agreement.
+  In both cases the status value and data element content are determined solely by the vendor-specific agreement and not by any OCPP-mandated rule beyond FR.07.
+  The system does not override or reinterpret the status or data values defined by the agreement.
+
+================================================================================
+END OF TEST CASES
+================================================================================

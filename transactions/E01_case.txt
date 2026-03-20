@@ -1,0 +1,354 @@
+E01 - Start Transaction options
+Test Cases
+================================================================================
+
+TC-E01-001
+Title: Transaction started on parking bay occupancy detection
+Requirement: E01.FR.01
+Steps:
+  1. Configure the Charging Station so that TxStartPoint contains ParkingBayOccupancy.
+  2. Ensure no transaction is currently ongoing on the EVSE.
+  3. Drive an EV into the parking bay so that the parking bay occupancy detector triggers.
+Expected Result:
+  The Charging Station starts a transaction and sends a TransactionEventRequest to the CSMS
+  with eventType = Started and triggerReason = EVDetected.
+  The CSMS receives the message and replies with a TransactionEventResponse.
+  The transaction is now ongoing.
+
+--------------------------------------------------------------------------------
+
+TC-E01-002
+Title: Transaction started when EV physically connects to the Charging Station
+Requirement: E01.FR.02
+Steps:
+  1. Configure the Charging Station so that TxStartPoint contains EVConnected (and NOT ParkingBayOccupancy).
+  2. Ensure no transaction is currently ongoing on the EVSE.
+  3. Plug the charging cable into both the Charging Station and the EV so that the
+     Charging Station detects a physical connection with the EV.
+Expected Result:
+  The Charging Station starts a transaction and sends a TransactionEventRequest to the CSMS
+  with eventType = Started, chargingState = EVConnected, and triggerReason = CablePluggedIn.
+  The CSMS replies with a TransactionEventResponse.
+  The transaction is now ongoing.
+
+--------------------------------------------------------------------------------
+
+TC-E01-003
+Title: Transaction started upon successful EV Driver authorization
+Requirement: E01.FR.03
+Steps:
+  1. Configure the Charging Station so that TxStartPoint contains Authorized
+     (and NOT ParkingBayOccupancy).
+  2. Ensure no transaction is currently ongoing on the EVSE.
+  3. The EV Driver presents a valid identification credential (e.g., RFID card) to the
+     Charging Station.
+  4. The Charging Station validates the credential successfully (via Authorization Cache or
+     AuthorizeRequest to the CSMS).
+Expected Result:
+  The Charging Station starts a transaction and sends a TransactionEventRequest to the CSMS
+  with eventType = Started and triggerReason = Authorized.
+  The CSMS replies with a TransactionEventResponse.
+  The transaction is now ongoing.
+
+--------------------------------------------------------------------------------
+
+TC-E01-004
+Title: Transaction started after first signed meter value is retrieved
+Requirement: E01.FR.04
+Steps:
+  1. Configure the Charging Station so that TxStartPoint contains DataSigned
+     (and NOT ParkingBayOccupancy, EVConnected, or Authorized).
+  2. Set the configuration variable SampledDataSignReadings to true.
+  3. Confirm the Charging Station has a meter capable of signing measured values.
+  4. Ensure no transaction is currently ongoing on the EVSE.
+  5. The EV Driver plugs in the cable and completes authorization.
+  6. The Charging Station requests a signed meter value from the meter.
+  7. Wait for the meter to return a signed meter value (this may take some time).
+Expected Result:
+  Once the signed meter value is received, the Charging Station starts a transaction and
+  sends a TransactionEventRequest to the CSMS with eventType = Started and
+  triggerReason = SignedDataReceived.
+  The CSMS replies with a TransactionEventResponse.
+  The transaction is now ongoing.
+
+--------------------------------------------------------------------------------
+
+TC-E01-005
+Title: Transaction started when power path is closed (authorized and EV connected)
+Requirement: E01.FR.05
+Steps:
+  1. Configure the Charging Station so that TxStartPoint contains PowerPathClosed
+     (and NOT ParkingBayOccupancy, EVConnected, Authorized, or DataSigned).
+  2. Ensure no transaction is currently ongoing on the EVSE.
+  3. Plug the charging cable into both the Charging Station and the EV.
+  4. The EV Driver successfully authorizes.
+Expected Result:
+  The Charging Station starts a transaction and sends a TransactionEventRequest to the CSMS
+  with eventType = Started, chargingState = Charging, and
+  triggerReason = ChargingStateChanged.
+  The CSMS replies with a TransactionEventResponse.
+  The transaction is now ongoing.
+
+--------------------------------------------------------------------------------
+
+TC-E01-006
+Title: Transaction started when energy transfer begins
+Requirement: E01.FR.06
+Steps:
+  1. Configure the Charging Station so that TxStartPoint contains EnergyTransfer
+     (and NOT ParkingBayOccupancy, EVConnected, Authorized, DataSigned, or PowerPathClosed).
+  2. Ensure no transaction is currently ongoing on the EVSE.
+  3. The EV Driver authorizes and plugs in the cable.
+  4. The Charging Station closes the power relay.
+  5. The EV begins drawing energy, causing actual energy flow to start.
+Expected Result:
+  The Charging Station starts a transaction and sends a TransactionEventRequest to the CSMS
+  with eventType = Started, chargingState = Charging, and
+  triggerReason = ChargingStateChanged.
+  The CSMS replies with a TransactionEventResponse.
+  The transaction is now ongoing.
+
+--------------------------------------------------------------------------------
+
+TC-E01-007
+Title: seqNo field is set correctly on TransactionEventRequest
+Requirement: E01.FR.07
+Steps:
+  1. Configure the Charging Station with any valid TxStartPoint value.
+  2. Trigger a transaction start so that the Charging Station creates a
+     TransactionEventRequest (eventType = Started).
+  3. Inspect the seqNo field in the outgoing TransactionEventRequest.
+  4. Trigger a subsequent TransactionEventRequest for the same transaction (e.g., an
+     Updated event) and inspect its seqNo field.
+Expected Result:
+  The seqNo field in the first TransactionEventRequest for a transaction is set according to
+  the Sequence Number Generation rules defined in the OCPP 2.0.1 specification
+  (starting at 0 and incrementing by 1 for each subsequent event of the same transaction).
+  Each successive TransactionEventRequest for the same transaction carries a seqNo value
+  that is exactly 1 greater than the previous message's seqNo.
+
+--------------------------------------------------------------------------------
+
+TC-E01-008
+Title: transactionId is unique across all transactions including after reboot
+Requirement: E01.FR.08
+Steps:
+  1. Record the transactionId values generated by the Charging Station across multiple
+     consecutive transactions (at least 5 distinct transactions).
+  2. Reboot the Charging Station.
+  3. Start additional transactions after the reboot and record their transactionId values.
+  4. Update the Charging Station firmware, then start further transactions and record their
+     transactionId values.
+  5. Compare all collected transactionId values.
+Expected Result:
+  Every transactionId value is unique; no transactionId from any session (pre-reboot,
+  post-reboot, post-firmware-update) matches any other transactionId generated by the same
+  Charging Station.
+
+--------------------------------------------------------------------------------
+
+TC-E01-009
+Title: Configured meter measurands are included in TransactionEventRequest at start when EVSE is known
+Requirement: E01.FR.09
+Steps:
+  1. Configure the Charging Station to send meter data in the TransactionEventRequest
+     (eventType = Started) by setting the appropriate Meter Values configuration variables.
+  2. Ensure the EVSE is known (identified) at the time the transaction starts.
+  3. Trigger a transaction start.
+  4. Capture the outgoing TransactionEventRequest (eventType = Started).
+  5. Inspect the optional meterValue field of the message.
+Expected Result:
+  The TransactionEventRequest (eventType = Started) contains the meterValue field populated
+  with the configured measurands.
+  Each meterValue entry has context = Transaction.Begin.
+
+--------------------------------------------------------------------------------
+
+TC-E01-010
+Title: IdTokenType information is included in TransactionEventRequest after authorization
+Requirement: E01.FR.10
+Steps:
+  1. Configure the Charging Station with any valid TxStartPoint that requires authorization.
+  2. The EV Driver presents a valid identification credential and is successfully authorized.
+  3. Capture the TransactionEventRequest sent by the Charging Station.
+  4. Inspect the idToken field of the message.
+Expected Result:
+  The TransactionEventRequest sent after authorization contains the idToken field populated
+  with the EV Driver's IdTokenType information (token value and token type).
+
+--------------------------------------------------------------------------------
+
+TC-E01-011
+Title: CSMS verifies identifier validity received in TransactionEventRequest
+Requirement: E01.FR.11
+Steps:
+  1. The Charging Station sends a TransactionEventRequest that contains IdTokenType
+     information (as per E01.FR.10).
+  2. Observe the CSMS behavior upon receiving the TransactionEventRequest.
+Expected Result:
+  The CSMS validates the identifier contained in the idToken field of the
+  TransactionEventRequest against its authorization records.
+  The CSMS does not skip the validity check before generating the response.
+
+--------------------------------------------------------------------------------
+
+TC-E01-012
+Title: CSMS response includes idTokenInfo with authorization status and groupIdToken
+Requirement: E01.FR.12
+Steps:
+  1. The EV Driver authorizes and the Charging Station sends a TransactionEventRequest
+     containing an idToken.
+  2. Capture the TransactionEventResponse returned by the CSMS.
+  3. Inspect the idTokenInfo field of the response.
+  4. Repeat with an idToken that belongs to a group token and inspect the
+     groupIdToken sub-field.
+Expected Result:
+  The TransactionEventResponse always includes the idTokenInfo field.
+  The idTokenInfo field contains an authorizationStatus value (e.g., Accepted, Blocked,
+  Expired, Invalid, or ConcurrentTx).
+  When the idToken is associated with a group token, the idTokenInfo field additionally
+  contains the groupIdToken field populated with the group token value.
+
+--------------------------------------------------------------------------------
+
+TC-E01-013
+Title: reservationId is included in TransactionEventRequest when transaction ends a reservation
+Requirement: E01.FR.13
+Steps:
+  1. Create an active reservation on the Charging Station for a specific EVSE.
+  2. The reserved EV Driver arrives, authorizes, and starts a transaction that consumes
+     (ends) the reservation.
+  3. Capture the first TransactionEventRequest (eventType = Started) sent for this
+     transaction.
+  4. Inspect the reservationId field of the message.
+Expected Result:
+  The TransactionEventRequest contains the reservationId field set to the identifier of the
+  reservation that the transaction has ended.
+
+--------------------------------------------------------------------------------
+
+TC-E01-014
+Title: No second transaction started on a different Connector of the same EVSE while one is active
+Requirement: E01.FR.14
+Steps:
+  1. Ensure the EVSE under test has more than one Connector.
+  2. Start a transaction on Connector 1 of the EVSE; confirm the TransactionEventRequest
+     (eventType = Started) has been sent and the transaction is ongoing.
+  3. Attempt to trigger a new transaction start on Connector 2 of the same EVSE (e.g., plug
+     in a second cable and/or present a second authorization credential) before the first
+     transaction has ended.
+  4. Observe the Charging Station behavior.
+Expected Result:
+  The Charging Station does NOT send a new TransactionEventRequest (eventType = Started) for
+  Connector 2 of the same EVSE while the transaction on Connector 1 is still active.
+  No second concurrent transaction is started on the same EVSE.
+
+--------------------------------------------------------------------------------
+
+TC-E01-015
+Title: triggerReason field is set in every TransactionEventRequest
+Requirement: E01.FR.15
+Steps:
+  1. Trigger transaction-related events that produce TransactionEventRequests under each
+     configured TxStartPoint value (ParkingBayOccupancy, EVConnected, Authorized,
+     DataSigned, PowerPathClosed, EnergyTransfer).
+  2. For each captured TransactionEventRequest, inspect the triggerReason field.
+Expected Result:
+  Every TransactionEventRequest contains the triggerReason field set to an appropriate
+  TriggerReasonEnumType value that correctly describes the event that triggered the message:
+    - EVDetected for ParkingBayOccupancy scenario
+    - CablePluggedIn for EVConnected scenario
+    - Authorized for Authorized scenario
+    - SignedDataReceived for DataSigned scenario
+    - ChargingStateChanged for PowerPathClosed and EnergyTransfer scenarios
+
+--------------------------------------------------------------------------------
+
+TC-E01-016
+Title: evse.id and evse.connectorId are included in TransactionEventRequest after EV connects
+Requirement: E01.FR.16
+Steps:
+  1. Configure the Charging Station with any valid TxStartPoint.
+  2. Connect the EV to the Charging Station (plug cable in on both sides).
+  3. Capture the next TransactionEventRequest sent after the EV connection is established.
+  4. Inspect the evse object within the message.
+Expected Result:
+  The TransactionEventRequest sent after EV connection contains the evse field with both
+  evse.id and evse.connectorId populated with the correct identifiers for the EVSE and
+  Connector in use.
+
+--------------------------------------------------------------------------------
+
+TC-E01-017
+Title: Meter measurands are deferred to first Updated event when EVSE is not known at transaction start
+Requirement: E01.FR.17
+Steps:
+  1. Configure the Charging Station to send meter data in the TransactionEventRequest
+     (eventType = Started) per the Meter Values configuration.
+  2. Arrange conditions so that the EVSE is NOT yet identified at the moment the
+     transaction starts (e.g., TxStartPoint = ParkingBayOccupancy before a cable is
+     plugged in).
+  3. Trigger the transaction start and capture the TransactionEventRequest (eventType =
+     Started).
+  4. Allow charging to begin; capture the subsequent TransactionEventRequest
+     (eventType = Updated) that occurs when charging starts.
+  5. Inspect the meterValue field of both messages.
+Expected Result:
+  The TransactionEventRequest (eventType = Started) does NOT contain the meter measurands
+  (meterValue field is absent or empty because the EVSE is unknown).
+  The TransactionEventRequest (eventType = Updated) that occurs when charging starts
+  contains the meterValue field populated with the configured measurands and each entry has
+  context = Transaction.Begin.
+
+--------------------------------------------------------------------------------
+
+TC-E01-018
+Title: chargingState is included in TransactionEventRequest when charging state changes
+Requirement: E01.FR.18
+Steps:
+  1. Start a transaction on the Charging Station.
+  2. Allow the charging state to change (e.g., from EVConnected to Charging, or from
+     Charging to SuspendedEV).
+  3. Capture the TransactionEventRequest sent at the moment of the state change.
+  4. Inspect the chargingState field of the message.
+Expected Result:
+  The TransactionEventRequest sent when the charging state changes contains the
+  chargingState field set to the new charging state value (e.g., Charging, EVConnected,
+  SuspendedEV, or SuspendedEVSE) that reflects the current state after the change.
+
+--------------------------------------------------------------------------------
+
+TC-E01-019
+Title: chargingState = SuspendedEV is sent when EV temporarily suspends energy transfer
+Requirement: E01.FR.19
+Steps:
+  1. Start a transaction and allow the EV to begin charging (energy transfer active).
+  2. Instruct or allow the EV to temporarily suspend energy transfer from its side
+     (e.g., EV battery management system pauses charging).
+  3. Capture the TransactionEventRequest sent by the Charging Station following the
+     suspension.
+  4. Inspect the chargingState field of the message.
+Expected Result:
+  The Charging Station sends a TransactionEventRequest with chargingState = SuspendedEV
+  when the EV temporarily suspends energy transfer.
+
+--------------------------------------------------------------------------------
+
+TC-E01-020
+Title: chargingState = EVConnected is sent when Charging Station cannot handle EV suspension
+Requirement: E01.FR.20
+Steps:
+  1. Configure or use a Charging Station that is not capable of handling a temporary
+     suspension of energy transfer from the EV side.
+  2. Start a transaction and allow the EV to begin charging.
+  3. Allow the EV to temporarily suspend energy transfer.
+  4. Capture the TransactionEventRequest sent by the Charging Station following the
+     suspension.
+  5. Inspect the chargingState field of the message.
+Expected Result:
+  Because the Charging Station cannot handle temporary EV suspension, it sends a
+  TransactionEventRequest with chargingState = EVConnected (instead of SuspendedEV).
+
+================================================================================
+END OF TEST CASES
+================================================================================

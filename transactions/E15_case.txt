@@ -1,0 +1,72 @@
+E15 - End of charging process
+Test Cases
+================================================================================
+
+TC-E15-001
+Title: Meter data added to TransactionEventRequest when configured to send meter data on transaction end
+Requirement: E15.FR.01
+Steps:
+  1. Configure the Charging Station to send meter data in the TransactionEventRequest with eventType = Ended (set the relevant measurands via the Meter Values configuration).
+  2. Start a charging transaction and allow energy to flow so that meter readings are recorded.
+  3. Trigger the end of the charging process (EV driver unplugs the cable from the EV).
+  4. Observe the TransactionEventRequest message sent by the Charging Station to the CSMS.
+Expected Result:
+  The Charging Station sends a TransactionEventRequest to the CSMS with eventType = Ended.
+  The message contains a non-empty meterValue field.
+  The meterValue field includes all measurands that were configured for reporting at transaction end.
+  No configured measurand is absent from the meterValue field (assuming the Charging Station is not low on memory).
+
+--------------------------------------------------------------------------------
+
+TC-E15-002
+Title: Meter data may be dropped from TransactionEventRequest when Charging Station is low on memory
+Requirement: E15.FR.02
+Steps:
+  1. Configure the Charging Station to send meter data in the TransactionEventRequest with eventType = Ended.
+  2. Simulate or induce a low-memory condition on the Charging Station.
+  3. Start a charging transaction and allow multiple meter readings to accumulate.
+  4. Trigger the end of the charging process (EV driver unplugs the cable).
+  5. Observe the TransactionEventRequest message sent by the Charging Station to the CSMS.
+Expected Result:
+  The Charging Station sends a TransactionEventRequest to the CSMS with eventType = Ended.
+  The meterValue field MAY contain fewer meter readings than were recorded during the session.
+  The system does not raise an error solely because some meter readings were omitted from the message.
+  The message is still accepted by the CSMS without rejection due to missing meter data.
+
+--------------------------------------------------------------------------------
+
+TC-E15-003
+Title: When dropping meter data under low memory, intermediate values are dropped first
+Requirement: E15.FR.03
+Steps:
+  1. Configure the Charging Station to send meter data in the TransactionEventRequest with eventType = Ended.
+  2. Simulate or induce a low-memory condition on the Charging Station so that it must drop some meter readings.
+  3. Allow a charging session to generate an ordered sequence of at least five meter readings (e.g., samples at T1, T2, T3, T4, T5).
+  4. Trigger the end of the charging process.
+  5. Observe the meterValue list in the TransactionEventRequest sent by the Charging Station to the CSMS.
+Expected Result:
+  The Charging Station sends a TransactionEventRequest to the CSMS with eventType = Ended.
+  The meterValue list does not begin dropping values from the start of the list (T1 is retained).
+  The meterValue list does not stop adding values at the end of the list (the last recorded value is retained).
+  Dropped entries are the intermediate (odd-indexed interior) values — i.e., the 1st interior value dropped is the second sample in the sequence, then the 4th sample, etc. (every other intermediate value), preserving boundary values.
+  The resulting list retains both the first-recorded and last-recorded meter readings.
+
+--------------------------------------------------------------------------------
+
+TC-E15-004
+Title: TransactionEventRequest with eventType = Ended is sent after receiving SessionStopReq from the EV
+Requirement: E15.FR.04
+Steps:
+  1. Establish an active charging session between the EV and the Charging Station (CS) with an ongoing transaction recorded at the CSMS.
+  2. Have the EV send a SessionStopReq message to the Charging Station to signal the end of the charging session.
+  3. Observe the Charging Station's OCPP communication toward the CSMS.
+Expected Result:
+  After receiving the SessionStopReq from the EV, the Charging Station sends a TransactionEventRequest to the CSMS.
+  The eventType field in the TransactionEventRequest is set to Ended.
+  The TransactionEventRequest is sent before or independently of any subsequent plug removal event.
+  The CSMS responds with a TransactionEventResponse, confirming receipt.
+  The CSMS records that the charging transaction has been stopped by the EV.
+
+================================================================================
+END OF TEST CASES
+================================================================================

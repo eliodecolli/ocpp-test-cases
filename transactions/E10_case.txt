@@ -1,0 +1,123 @@
+E10 - When cable disconnected on EV-side: Suspend Transaction
+Test Cases
+================================================================================
+
+TC-E10-001
+Title: Connector remains locked until EV Driver presents IdToken (non-permanently attached cable)
+Requirement: E10.FR.01
+Steps:
+  1. Ensure the Charging Station has a connector that is NOT permanently attached (i.e., the cable can be unplugged from the EV side).
+  2. Begin an active transaction on that connector.
+  3. Disconnect the cable on the EV side (cable disconnected from the EV).
+  4. Observe the physical state of the connector lock at the Charging Station side.
+  5. Attempt to physically remove the cable from the Charging Station connector without presenting an IdToken.
+Expected Result:
+  The connector at the Charging Station SHALL remain locked.
+  The cable cannot be removed from the Charging Station side.
+  No unlock signal is issued by the Charging Station.
+  The locked state persists until the EV Driver presents a valid IdToken.
+
+--------------------------------------------------------------------------------
+
+TC-E10-002
+Title: Transaction deauthorized when permanently attached cable is not plugged in within timeout
+Requirement: E10.FR.02
+Steps:
+  1. Configure the Charging Station with a permanently attached cable.
+  2. Authorize an EV Driver (IdToken accepted).
+  3. Do NOT plug the cable into the EV within the configured timeout period.
+  4. Wait for the timeout to expire.
+  5. Observe the Charging Station behavior and any messages sent to the CSMS.
+Expected Result:
+  After the timeout expires without the cable being plugged into the EV, the Charging Station SHALL deauthorize the transaction.
+  The transaction is terminated/cancelled.
+  No ongoing energy offer is established.
+  The Charging Station returns to an available state for the connector.
+
+--------------------------------------------------------------------------------
+
+TC-E10-003
+Title: seqNo field is set correctly in every TransactionEventRequest
+Requirement: E10.FR.03
+Steps:
+  1. Establish a transaction on the Charging Station (authorize, cable connected, energy transfer begins).
+  2. Disconnect the cable on the EV side to trigger a suspension event.
+  3. Capture every TransactionEventRequest message sent by the Charging Station to the CSMS throughout the transaction lifecycle (Started, Updated, Ended events).
+  4. Inspect the seqNo field in each captured TransactionEventRequest.
+Expected Result:
+  Every TransactionEventRequest SHALL contain a seqNo field.
+  The seqNo values SHALL be assigned according to the Sequence Number Generation rules defined in the specification (i.e., monotonically incrementing integers beginning at 0 for the first event of a transaction, with no gaps).
+  The CSMS is able to use the seqNo values to verify the completeness of all transaction information for that transaction ID.
+
+--------------------------------------------------------------------------------
+
+TC-E10-004
+Title: Configured measurands included in meterValue field of TransactionEventRequest(eventType = Ended)
+Requirement: E10.FR.04
+Steps:
+  1. Configure the Charging Station to send meter data in the TransactionEventRequest for eventType = Ended (refer to Meter Values - Configuration settings).
+  2. Configure specific measurands (e.g., Energy.Active.Import.Register, Power.Active.Import) in the relevant configuration variable.
+  3. Begin a transaction, transfer energy, then disconnect the cable on the EV side to end the transaction.
+  4. Capture the TransactionEventRequest(eventType = Ended) message sent to the CSMS.
+  5. Inspect the meterValue field of that message.
+Expected Result:
+  The TransactionEventRequest with eventType = Ended SHALL contain a meterValue field.
+  The meterValue field SHALL include all measurands that were configured for inclusion at transaction end.
+  Each measurand entry SHALL have the correct unit, value, and context appropriate to the end-of-transaction reading.
+  The CSMS receives this data and can account for full transaction usage.
+
+--------------------------------------------------------------------------------
+
+TC-E10-005
+Title: Charging Station may drop meter data when running low on memory
+Requirement: E10.FR.05
+Steps:
+  1. Configure the Charging Station to send meter data in the TransactionEventRequest(eventType = Ended) (E10.FR.04 precondition satisfied).
+  2. Simulate or induce a low-memory condition on the Charging Station (e.g., accumulate a large number of sampled meter values during a long transaction).
+  3. End the transaction by disconnecting the cable on the EV side.
+  4. Capture the TransactionEventRequest(eventType = Ended) sent to the CSMS.
+  5. Inspect the meterValue field of that message.
+Expected Result:
+  Under a low-memory condition, the Charging Station MAY omit some meter value entries from the meterValue field in the TransactionEventRequest(eventType = Ended).
+  The message is still sent successfully to the CSMS without the full set of meter readings.
+  The system does not crash or fail to send the TransactionEventRequest due to memory constraints.
+  The CSMS receives the message, potentially with a reduced or absent meterValue field.
+
+--------------------------------------------------------------------------------
+
+TC-E10-006
+Title: Intermediate meter values are dropped first when memory is low (not start or end values)
+Requirement: E10.FR.06
+Steps:
+  1. Satisfy the preconditions of E10.FR.05: meter data is configured for the Ended event, and the Charging Station is running low on memory.
+  2. During the transaction, accumulate a sequence of sampled meter values (label them positionally: value 1, value 2, value 3, value 4, value 5, etc.).
+  3. End the transaction by disconnecting the cable on the EV side.
+  4. Capture the TransactionEventRequest(eventType = Ended) sent to the CSMS.
+  5. Inspect the order and positions of the meter value entries that were retained versus dropped.
+Expected Result:
+  The Charging Station SHALL drop intermediate (odd-positioned) values first: value 1, value 3, value 5, etc. are candidates for removal before others.
+  The Charging Station SHALL NOT drop values from the beginning of the list first (i.e., it does not simply truncate from the front).
+  The Charging Station SHALL NOT stop adding new values to the list first (i.e., it does not simply cap the list early).
+  The retained values in the meterValue field reflect this dropping strategy, preserving boundary/even-positioned values as long as possible.
+
+--------------------------------------------------------------------------------
+
+TC-E10-007
+Title: Signed meter values retrieved and placed in signedMeterValue field when SampledDataSignReadings is true
+Requirement: E10.FR.07
+Steps:
+  1. Set the configuration variable SampledDataSignReadings to true on the Charging Station.
+  2. Begin a transaction (authorize EV Driver, connect cable, start energy transfer).
+  3. Allow the Charging Station to sample meter data during the transaction.
+  4. End the transaction by disconnecting the cable on the EV side.
+  5. Capture the TransactionEventRequest messages (especially any with sampled meter data) sent to the CSMS.
+  6. Inspect the sampledValues entries within the meterValue field, specifically the signedMeterValue sub-field.
+Expected Result:
+  When SampledDataSignReadings is true, the Charging Station SHALL retrieve signed meter values from the meter hardware.
+  Each affected sampledValue entry SHALL contain a populated signedMeterValue field.
+  The signedMeterValue field SHALL contain the cryptographic signature data as provided by the meter.
+  The CSMS receives the TransactionEventRequest with the signed meter values intact and can use them for verification purposes.
+
+================================================================================
+END OF TEST CASES
+================================================================================

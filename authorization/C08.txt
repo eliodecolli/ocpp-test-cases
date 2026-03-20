@@ -1,0 +1,68 @@
+C08 - Authorization at EVSE using ISO 15118 External Identification Means (EIM)
+C08 - Authorization at EVSE using ISO 15118 External Identification Means (EIM)
+C08 - Authorization at EVSE using ISO 15118 External Identification Means (EIM)
+C08 - Authorization at EVSE using ISO 15118 External Identification Means (EIM)
+C08 - Authorization at EVSE using ISO 15118 External Identification Means (EIM)
+C08 - Authorization at EVSE using ISO 15118 External Identification Means (EIM)
+C08 - Authorization at EVSE using ISO 15118 External Identification Means (EIM)
+C08 - Authorization at EVSE using ISO 15118 External Identification
+Means (EIM)
+Table 73. C08 - Authorization at EVSE using ISO 15118 External Identification Means (EIM)
+No. Type Description
+1 Name Authorization at EVSE using ISO 15118 External Identification Means (EIM)
+2 ID C08 / 15118-1 D4
+Functional block C. Authorization
+Reference ISO15118-1 D4
+3 Objectives To authorize the EV via the Charging Station, with help of the CSMS. Also see ISO15118-1, use
+case Objective D4, page 28.
+4 Description The Charging Station sends an AuthorizeRequest message based on information provided by the
+EV. Also see ISO15118-1, use case Description D4 up to and including "NOTE", page 28.
+Actors Actors: EV, Charging Station, CSMS
+Scenario description 15118
+See ISO15118-1, use case Description (Scenarion Description) D4, page 28.
+OCPP
+1. The Charging Station sends an AuthorizeRequest with an idToken containing the External
+Identification Means (EIM).
+2. The CSMS responds with an AuthorizeResponse.
+Alternative scenario(s) C08 - Authorization at EVSE using ISO 15118 External Identification Means (EIM) -
+Requirements
+Table 74. C08 - Requirements
+ID Precondition Requirement definition
+C08.FR.01 The Charging Station SHALL send the identification to the CSMS
+for validation.
+C08.FR.02 EV Driver SHALL activate the authorization within a specific time
+after connecting the EV to the EVSE or the EVSE SHALL have an
+HMI to authorize the restart of the identification process.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 93/471 Part 2 - Specification
+2.3. GroupId
+C08 - Authorization at EVSE using ISO 15118 External Identification Means (EIM)
+5 Prerequisite(s) The Charging Station is Offline.
+Unknown IdToken presented (Not in the Authorization Cache and/or Local Authorization List).
+6 Postcondition(s) Successful postcondition:
+The authorization status in TransactionEventResponse is Accepted.
+Failure postcondition:
+The authorization status in TransactionEventResponse is not Accepted when
+OfflineTxForUnknownIdEnabled is True.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 104/471 Part 2 - Specification
+EV DriverCharging Station
+The Charging Station is Offline.
+present IdToken
+opt[If enabled]
+check Authorization Cache
+opt[If implemented & enabled]
+check Local Authorization List
+IdToken unknown
+alt[OfflineTxForUnknownIdEnabled() = True]
+accept identifier
+opt
+notification
+[OfflineTxForUnknownIdEnabled() = False]
+reject identifier
+opt
+notification
+Figure 36. Sequence Diagram: Start Transaction - Unknown Offline Authorization
+7 Error handling n/a
+8 Remark(s) This applies to all types of identifiers, including an eMAID that is presented as part of an ISO
+15118 contract certificate.

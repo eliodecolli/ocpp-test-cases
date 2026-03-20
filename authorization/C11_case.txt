@@ -1,0 +1,283 @@
+C11 - Clear Authorization Data in Authorization Cache
+Test Cases
+======================================================================
+
+OVERVIEW
+--------
+Use case C11 describes how a Charging Station Management System (CSMS) can
+instruct a Charging Station to clear all IdTokens stored in its Authorization
+Cache. The Charging Station must attempt the operation and report back whether
+it succeeded or was rejected.
+
+Key requirements driving these tests:
+  - C11.FR.01: On receiving ClearCacheRequest, the Charging Station SHALL
+               attempt to clear its Authorization Cache.
+  - C11.FR.02: The Charging Station SHALL always send a ClearCacheResponse
+               indicating success or failure.
+  - C11.FR.03: If the cache was cleared successfully, the response status SHALL
+               be "Accepted".
+  - C11.FR.04: If the AuthCacheEnabled configuration variable is false, the
+               response status SHALL be "Rejected".
+  - C11.FR.05: If the Charging Station fails to clear the cache for any other
+               reason, the response status SHALL be "Rejected".
+
+======================================================================
+TEST CASE 1 - Successful Cache Clear (Happy Path)
+----------------------------------------------------------------------
+Title:
+  CSMS successfully clears a populated Authorization Cache
+
+Scenario:
+  The Authorization Cache is supported, enabled (AuthCacheEnabled = true),
+  and currently contains one or more stored IdTokens. The CSMS sends a
+  request to clear the cache and the Charging Station is able to do so
+  without any issue.
+
+Preconditions:
+  - The Charging Station supports the Authorization Cache feature.
+  - AuthCacheEnabled is set to true.
+  - The Authorization Cache contains at least one IdToken entry.
+  - The Charging Station is online and connected to the CSMS.
+
+Steps:
+  1. The CSMS sends a ClearCacheRequest to the Charging Station.
+  2. The Charging Station receives the request and attempts to clear all
+     IdTokens from its Authorization Cache.
+  3. The Charging Station successfully clears the Authorization Cache.
+  4. The Charging Station sends a ClearCacheResponse back to the CSMS.
+
+Expected Result:
+  - The Charging Station sends ClearCacheResponse with status = "Accepted".
+  - All IdTokens have been removed from the Authorization Cache.
+  - The Authorization Cache is now empty.
+
+======================================================================
+TEST CASE 2 - Cache Clear on an Already-Empty Cache
+----------------------------------------------------------------------
+Title:
+  CSMS clears an Authorization Cache that is already empty
+
+Scenario:
+  The Authorization Cache is supported and enabled, but it contains no
+  IdToken entries at the time the ClearCacheRequest is received. This
+  tests that clearing an empty cache is still treated as a successful
+  operation.
+
+Preconditions:
+  - The Charging Station supports the Authorization Cache feature.
+  - AuthCacheEnabled is set to true.
+  - The Authorization Cache is currently empty (no IdTokens stored).
+  - The Charging Station is online and connected to the CSMS.
+
+Steps:
+  1. The CSMS sends a ClearCacheRequest to the Charging Station.
+  2. The Charging Station receives the request and attempts to clear its
+     Authorization Cache (which is already empty).
+  3. The Charging Station completes the clear operation without error.
+  4. The Charging Station sends a ClearCacheResponse back to the CSMS.
+
+Expected Result:
+  - The Charging Station sends ClearCacheResponse with status = "Accepted".
+  - The Authorization Cache remains empty.
+  - No error is raised for clearing an already-empty cache.
+
+======================================================================
+TEST CASE 3 - Cache Clear Rejected Because AuthCacheEnabled is False
+----------------------------------------------------------------------
+Title:
+  CSMS requests cache clear but AuthCacheEnabled configuration is disabled
+
+Scenario:
+  The Authorization Cache feature exists on the Charging Station but has
+  been disabled via the AuthCacheEnabled configuration variable. When the
+  CSMS sends a ClearCacheRequest, the Charging Station cannot honor it
+  because the cache is not active, and must respond with a rejection.
+
+Preconditions:
+  - The Charging Station supports the Authorization Cache feature.
+  - AuthCacheEnabled is set to false.
+  - The Charging Station is online and connected to the CSMS.
+
+Steps:
+  1. The CSMS sends a ClearCacheRequest to the Charging Station.
+  2. The Charging Station receives the request and checks whether the
+     Authorization Cache is enabled.
+  3. The Charging Station determines that AuthCacheEnabled = false and
+     cannot clear the cache.
+  4. The Charging Station sends a ClearCacheResponse back to the CSMS.
+
+Expected Result:
+  - The Charging Station sends ClearCacheResponse with status = "Rejected".
+  - No cache clearing is performed.
+  - The configuration variable AuthCacheEnabled remains false.
+
+======================================================================
+TEST CASE 4 - Cache Clear Fails Due to Internal Error
+----------------------------------------------------------------------
+Title:
+  Authorization Cache clear fails because of an internal Charging Station
+  error
+
+Scenario:
+  The Authorization Cache is supported and enabled, but the Charging Station
+  encounters an internal error when attempting to clear the cache (for
+  example, a storage or memory fault). The Charging Station must still
+  respond with the appropriate failure status.
+
+Preconditions:
+  - The Charging Station supports the Authorization Cache feature.
+  - AuthCacheEnabled is set to true.
+  - The Authorization Cache contains one or more IdToken entries.
+  - The Charging Station is online and connected to the CSMS.
+  - A condition exists that will prevent the cache clear from completing
+    (e.g., simulated storage failure or locked resource).
+
+Steps:
+  1. The CSMS sends a ClearCacheRequest to the Charging Station.
+  2. The Charging Station receives the request and attempts to clear its
+     Authorization Cache.
+  3. The Charging Station encounters an internal error and cannot complete
+     the clear operation.
+  4. The Charging Station sends a ClearCacheResponse back to the CSMS.
+
+Expected Result:
+  - The Charging Station sends ClearCacheResponse with status = "Rejected".
+  - A response is always returned (the Charging Station does not go silent).
+  - The Authorization Cache may still contain IdTokens.
+
+======================================================================
+TEST CASE 5 - Response is Always Sent After ClearCacheRequest
+----------------------------------------------------------------------
+Title:
+  Charging Station always sends a ClearCacheResponse regardless of outcome
+
+Scenario:
+  This test verifies that the Charging Station never silently ignores a
+  ClearCacheRequest. In any outcome — success or failure — a
+  ClearCacheResponse containing a status must be returned to the CSMS.
+  This covers requirement C11.FR.02.
+
+Preconditions:
+  - The Charging Station is online and connected to the CSMS.
+  - The Charging Station supports the Authorization Cache feature.
+
+Steps:
+  1. The CSMS sends a ClearCacheRequest to the Charging Station under a
+     condition where the outcome may be either success or failure
+     (e.g., run this test for both AuthCacheEnabled = true and
+     AuthCacheEnabled = false).
+  2. The Charging Station receives the request.
+  3. The Charging Station processes the request.
+  4. Observe whether a ClearCacheResponse is returned.
+
+Expected Result:
+  - The Charging Station always sends a ClearCacheResponse message.
+  - The response always contains a status field (either "Accepted" or
+    "Rejected").
+  - No timeout or missing response occurs.
+
+======================================================================
+TEST CASE 6 - Only CSMS Can Initiate a Cache Clear
+----------------------------------------------------------------------
+Title:
+  Cache clear is only triggered by a CSMS-originated ClearCacheRequest
+
+Scenario:
+  The cache clear operation is an externally initiated action; the Charging
+  Station does not clear its Authorization Cache on its own without
+  receiving a ClearCacheRequest from the CSMS. This test verifies that the
+  cache remains intact when no request has been sent.
+
+Preconditions:
+  - The Charging Station supports the Authorization Cache feature.
+  - AuthCacheEnabled is set to true.
+  - The Authorization Cache contains at least one IdToken entry.
+  - No ClearCacheRequest has been sent from the CSMS.
+
+Steps:
+  1. Allow the Charging Station to operate normally (handle transactions,
+     authorizations, etc.) for a period of time without the CSMS sending
+     a ClearCacheRequest.
+  2. After the observation period, inspect the Authorization Cache contents.
+
+Expected Result:
+  - The Authorization Cache has not been spontaneously cleared.
+  - IdTokens that were present remain in the cache (subject only to their
+    own normal expiry rules, not a full cache wipe).
+  - No ClearCacheResponse is generated without a corresponding
+    ClearCacheRequest.
+
+======================================================================
+TEST CASE 7 - Cache Clear While a Transaction is Active
+----------------------------------------------------------------------
+Title:
+  CSMS requests cache clear while an active charging transaction is ongoing
+
+Scenario:
+  A vehicle is currently charging (an active transaction exists) when the
+  CSMS sends a ClearCacheRequest. This tests that the Charging Station
+  handles the request properly without disrupting the active transaction
+  and still attempts to clear the Authorization Cache.
+
+Preconditions:
+  - The Charging Station supports the Authorization Cache feature.
+  - AuthCacheEnabled is set to true.
+  - At least one charging transaction is currently active on the Charging
+    Station.
+  - The Authorization Cache contains at least one IdToken entry.
+  - The Charging Station is online and connected to the CSMS.
+
+Steps:
+  1. Confirm that an active charging transaction is in progress.
+  2. The CSMS sends a ClearCacheRequest to the Charging Station.
+  3. The Charging Station receives the request and attempts to clear its
+     Authorization Cache.
+  4. The Charging Station sends a ClearCacheResponse back to the CSMS.
+  5. Observe the state of the active transaction after the response.
+
+Expected Result:
+  - The Charging Station sends ClearCacheResponse with status = "Accepted"
+    (assuming the clear succeeds) or "Rejected" (if it fails).
+  - The active charging transaction is not interrupted or affected by the
+    cache clear operation.
+  - Future authorization lookups after the clear do not use the old cached
+    IdTokens.
+
+======================================================================
+TEST CASE 8 - Subsequent Authorization After Cache Clear
+----------------------------------------------------------------------
+Title:
+  Authorization attempt after cache clear falls back to CSMS lookup
+
+Scenario:
+  After the Authorization Cache has been successfully cleared, a user
+  presents an IdToken that was previously cached. Since the cache no longer
+  holds the token, the Charging Station must perform a fresh authorization
+  check with the CSMS rather than returning a locally cached result. This
+  verifies the postcondition of a successful cache clear.
+
+Preconditions:
+  - The Charging Station supports the Authorization Cache feature.
+  - AuthCacheEnabled is set to true.
+  - The Authorization Cache was successfully cleared (status = "Accepted"
+    was returned for a prior ClearCacheRequest).
+  - An IdToken is available that was previously stored in the cache.
+  - The Charging Station is online and connected to the CSMS.
+
+Steps:
+  1. Confirm the Authorization Cache has been cleared (from a prior
+     successful ClearCacheRequest).
+  2. Present the IdToken (previously cached) at the Charging Station
+     for authorization.
+  3. Observe the authorization flow used by the Charging Station.
+
+Expected Result:
+  - The Charging Station does not find the IdToken in its local
+    Authorization Cache (the cache is empty).
+  - The Charging Station initiates an online authorization request to
+    the CSMS.
+  - The CSMS responds and the authorization result is determined
+    based on the live CSMS response, not a stale cached value.
+
+======================================================================
+END OF TEST CASES

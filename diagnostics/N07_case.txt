@@ -1,0 +1,258 @@
+N07 - Alert Event
+Test Cases
+================================================================================
+
+TC-N07-001
+Title: CSMS responds with empty NotifyEventResponse upon receiving a NotifyEventRequest
+Requirement: N07.FR.03
+Steps:
+  1. Ensure the Charging Station has at least one active VariableMonitoring setting configured.
+  2. Trigger the monitored variable so the monitoring condition is met (e.g., exceed an UpperThreshold).
+  3. Observe the message sent from the Charging Station to the CSMS.
+  4. Observe the response sent from the CSMS back to the Charging Station.
+Expected Result:
+  The Charging Station sends a NotifyEventRequest to the CSMS.
+  The CSMS sends back a NotifyEventResponse with no body fields (empty response).
+  No error or rejection is returned by the CSMS.
+
+--------------------------------------------------------------------------------
+
+TC-N07-002
+Title: Cleared event sent when monitored value returns within UpperThreshold
+Requirement: N07.FR.02
+Steps:
+  1. Configure an UpperThreshold VariableMonitor on a numeric variable with a threshold value (e.g., 100).
+  2. Set the monitored variable value above the threshold (e.g., 110) to trigger the monitor.
+  3. Confirm the Charging Station sends a NotifyEventRequest for the trigger.
+  4. Set the monitored variable value back below the threshold (e.g., 95).
+  5. Observe the next NotifyEventRequest sent by the Charging Station.
+Expected Result:
+  The Charging Station sends a NotifyEventRequest containing an eventData element where the
+  attribute "cleared" is set to true.
+  The eventData identifies the same Component, Variable, and variableMonitoringId that was
+  triggered in step 3.
+
+--------------------------------------------------------------------------------
+
+TC-N07-003
+Title: Cleared event sent when monitored value returns within LowerThreshold
+Requirement: N07.FR.02
+Steps:
+  1. Configure a LowerThreshold VariableMonitor on a numeric variable with a threshold value (e.g., 20).
+  2. Set the monitored variable value below the threshold (e.g., 10) to trigger the monitor.
+  3. Confirm the Charging Station sends a NotifyEventRequest for the trigger.
+  4. Set the monitored variable value back above the threshold (e.g., 25).
+  5. Observe the next NotifyEventRequest sent by the Charging Station.
+Expected Result:
+  The Charging Station sends a NotifyEventRequest containing an eventData element where the
+  attribute "cleared" is set to true.
+  The eventData identifies the same Component, Variable, and variableMonitoringId as the original
+  trigger event.
+
+--------------------------------------------------------------------------------
+
+TC-N07-004
+Title: Monitor event queued while offline when severity is within OfflineMonitoringEventQueuingSeverity
+Requirement: N07.FR.04
+Steps:
+  1. Set the OfflineMonitoringEventQueuingSeverity configuration variable to a known value (e.g., 4).
+  2. Configure a VariableMonitor whose severity number is equal to or lower than 4.
+  3. Disconnect the Charging Station from the CSMS (simulate offline state).
+  4. Trigger the monitor condition while the Charging Station is offline.
+  5. Observe that no NotifyEventRequest is sent during the offline period.
+  6. Restore the network connection between the Charging Station and the CSMS.
+  7. Observe the messages sent by the Charging Station after reconnection.
+Expected Result:
+  While offline, no NotifyEventRequest is transmitted by the Charging Station.
+  After reconnection, the Charging Station sends the queued NotifyEventRequest(s) to the CSMS.
+  The CSMS responds with NotifyEventResponse to each received request.
+
+--------------------------------------------------------------------------------
+
+TC-N07-005
+Title: Monitor event not queued while offline when severity exceeds OfflineMonitoringEventQueuingSeverity
+Requirement: N07.FR.04
+Steps:
+  1. Set the OfflineMonitoringEventQueuingSeverity configuration variable to a known value (e.g., 4).
+  2. Configure a VariableMonitor whose severity number is greater than 4 (e.g., 5).
+  3. Disconnect the Charging Station from the CSMS (simulate offline state).
+  4. Trigger the monitor condition while the Charging Station is offline.
+  5. Restore the network connection between the Charging Station and the CSMS.
+  6. Observe messages sent by the Charging Station after reconnection.
+Expected Result:
+  After reconnection, the Charging Station does NOT send a NotifyEventRequest for the event
+  that was triggered while offline and whose severity exceeded OfflineMonitoringEventQueuingSeverity.
+  No queued event for this monitor is delivered to the CSMS.
+
+--------------------------------------------------------------------------------
+
+TC-N07-006
+Title: Cause field may include eventId of triggering event when one event causes another
+Requirement: N07.FR.05
+Steps:
+  1. Configure two VariableMonitors such that triggering one monitor is expected to cause another
+     monitor to be triggered (a causal chain).
+  2. Trigger the first monitor condition.
+  3. Observe the NotifyEventRequest messages sent by the Charging Station.
+Expected Result:
+  The Charging Station MAY include the eventId of the first event in the "cause" field of the
+  eventData element of the second NotifyEventRequest.
+  If the cause field is present, its value matches the eventId assigned to the originating event.
+  The cause field is optional; its absence does not constitute a failure.
+
+--------------------------------------------------------------------------------
+
+TC-N07-007
+Title: EventData contains Component, Variable, and variableMonitoringId when monitor is triggered
+Requirement: N07.FR.06
+Steps:
+  1. Configure a VariableMonitor on a specific Component/Variable combination.
+  2. Trigger the monitor condition.
+  3. Capture the NotifyEventRequest sent by the Charging Station.
+  4. Inspect the eventData element within the NotifyEventRequest.
+Expected Result:
+  The eventData element contains a non-empty "component" field identifying the monitored component.
+  The eventData element contains a non-empty "variable" field identifying the monitored variable.
+  The eventData element contains a non-empty "variableMonitoringId" field matching the ID of the
+  monitor that was triggered.
+  All three fields are present and populated in every eventData entry.
+
+--------------------------------------------------------------------------------
+
+TC-N07-008
+Title: First NotifyEventRequest for an event has seqNo set to 0
+Requirement: N07.FR.07
+Steps:
+  1. Configure a VariableMonitor on a Component/Variable combination.
+  2. Trigger the monitor condition.
+  3. Capture the first NotifyEventRequest sent by the Charging Station for this event.
+  4. Inspect the "seqNo" field in the message.
+Expected Result:
+  The "seqNo" field in the first NotifyEventRequest sent for this event is exactly 0.
+  Subsequent NotifyEventRequest messages for the same event (if the event spans multiple parts)
+  have seqNo values incremented sequentially (1, 2, ...).
+
+--------------------------------------------------------------------------------
+
+TC-N07-009
+Title: actualField is empty when monitor is triggered on a write-only variable
+Requirement: N07.FR.10
+Steps:
+  1. Identify or configure a variable that is designated as write-only.
+  2. Configure a VariableMonitor on that write-only variable.
+  3. Trigger the monitor condition for the write-only variable.
+  4. Capture the NotifyEventRequest sent by the Charging Station.
+  5. Inspect the "actual" field (actualField) within the eventData element.
+Expected Result:
+  The "actual" field in the eventData element of the NotifyEventRequest is empty (not populated).
+  No value is disclosed for the write-only variable in any NotifyEventRequest for this event.
+
+--------------------------------------------------------------------------------
+
+TC-N07-010
+Title: Charging Station checks new threshold against monitored value when UpperThreshold monitor is modified
+Requirement: N07.FR.11
+Steps:
+  1. Configure an UpperThreshold VariableMonitor on a numeric variable with threshold value T1 (e.g., 100).
+  2. Set the monitored variable to a value above T1 (e.g., 110) so the monitor is in a triggered state.
+  3. Modify the UpperThreshold to a new value T2 (e.g., 120) using SetVariableMonitoringRequest,
+     such that the current variable value (110) is now within the new threshold.
+  4. Observe whether the Charging Station sends a NotifyEventRequest.
+Expected Result:
+  The Charging Station evaluates the monitored variable value (110) against the new threshold (120).
+  Because the variable is now within the new threshold, the Charging Station sends a
+  NotifyEventRequest with eventData where "cleared" is set to true.
+  The cleared notification identifies the same Component, Variable, and variableMonitoringId.
+
+--------------------------------------------------------------------------------
+
+TC-N07-011
+Title: Charging Station checks new threshold against monitored value when LowerThreshold monitor is modified
+Requirement: N07.FR.11
+Steps:
+  1. Configure a LowerThreshold VariableMonitor on a numeric variable with threshold value T1 (e.g., 20).
+  2. Set the monitored variable to a value below T1 (e.g., 10) so the monitor is in a triggered state.
+  3. Modify the LowerThreshold to a new value T2 (e.g., 5) using SetVariableMonitoringRequest,
+     such that the new threshold is now exceeded by the current variable value (10).
+  4. Observe whether the Charging Station sends a NotifyEventRequest.
+Expected Result:
+  The Charging Station evaluates the monitored variable value (10) against the new threshold (5).
+  Because the new threshold is exceeded (10 > 5 is above lower threshold, so NOT exceeded — adjust:
+  the new threshold T2 = 5 means variable 10 is now within bounds), the Charging Station sends a
+  NotifyEventRequest with "cleared" set to true.
+  Alternatively, if the new threshold is still exceeded, the Charging Station sends a new trigger
+  NotifyEventRequest reflecting the updated threshold.
+  In either case, the Charging Station performs an immediate evaluation and generates the
+  appropriate NotifyEventRequest.
+
+--------------------------------------------------------------------------------
+
+TC-N07-012
+Title: No cleared NotifyEventRequest sent when an exceeded threshold monitor is removed
+Requirement: N07.FR.12
+Steps:
+  1. Configure an UpperThreshold or LowerThreshold VariableMonitor on a variable.
+  2. Set the monitored variable value so the threshold is exceeded (monitor is in triggered state).
+  3. Remove the VariableMonitor using a ClearVariableMonitoringRequest.
+  4. Observe whether the Charging Station sends any NotifyEventRequest after the removal.
+Expected Result:
+  The Charging Station does NOT send a NotifyEventRequest with "cleared" set to true following
+  the removal of the monitor.
+  No event notification of any kind is generated as a result of the monitor removal alone.
+
+--------------------------------------------------------------------------------
+
+TC-N07-013
+Title: VariableMonitoring settings are retained persistently across a reboot
+Requirement: N07.FR.13
+Steps:
+  1. Configure one or more VariableMonitors on the Charging Station using SetVariableMonitoringRequest.
+  2. Record the IDs and settings of the configured monitors.
+  3. Reboot the Charging Station (e.g., via a ResetRequest or a power cycle).
+  4. After the Charging Station reconnects, send a GetMonitoringReportRequest to the CSMS.
+  5. Inspect the GetMonitoringReportResponse or subsequent NotifyMonitoringReportRequest messages.
+Expected Result:
+  The VariableMonitoring settings configured before the reboot are present and active after the reboot.
+  The monitor IDs, types, severities, and thresholds match those configured in step 1.
+  The Charging Station reports these monitors in the GetMonitoringReport response without loss.
+
+--------------------------------------------------------------------------------
+
+TC-N07-014
+Title: Cleared event sent after reboot when threshold monitor value returns within bounds
+Requirement: N07.FR.14
+Steps:
+  1. Configure an UpperThreshold or LowerThreshold VariableMonitor on a numeric variable.
+  2. Set the monitored variable value so the threshold is exceeded (monitor enters triggered state).
+  3. Confirm the Charging Station sends a trigger NotifyEventRequest.
+  4. Reboot the Charging Station before the variable value returns within bounds.
+  5. After the reboot and reconnection, set the monitored variable value back within the threshold.
+  6. Observe the NotifyEventRequest messages sent by the Charging Station.
+Expected Result:
+  After the reboot, when the monitored variable returns within the configured threshold bounds, the
+  Charging Station sends a NotifyEventRequest with an eventData element where "cleared" is set to true.
+  The cleared event identifies the same Component, Variable, and variableMonitoringId as the
+  pre-reboot trigger event.
+  The Charging Station correctly restores the triggered state from persistent storage and issues the
+  cleared notification at the appropriate moment.
+
+--------------------------------------------------------------------------------
+
+TC-N07-015
+Title: Multi-part event reporting uses tbc field and incremented seqNo
+Requirement: N07.FR.07
+Steps:
+  1. Configure conditions such that a monitoring event generates enough eventData entries to require
+     more than one NotifyEventRequest message (i.e., the report must be split into multiple parts).
+  2. Trigger the monitoring condition.
+  3. Capture all NotifyEventRequest messages sent by the Charging Station for this event.
+  4. Inspect the "seqNo" and "tbc" (to-be-continued) fields in each message.
+Expected Result:
+  The first NotifyEventRequest has seqNo = 0 and tbc = true (if more parts follow).
+  Each subsequent part has seqNo incremented by 1 relative to the previous message.
+  The final part has tbc = false (or tbc absent/false), indicating the event report is complete.
+  The CSMS responds with a NotifyEventResponse to each part.
+
+================================================================================
+END OF TEST CASES
+================================================================================

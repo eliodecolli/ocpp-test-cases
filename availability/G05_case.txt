@@ -1,0 +1,79 @@
+G05 - Lock Failure
+Test Cases
+================================================================================
+
+TC-G05-001
+Title: Charging Station does not start charging when connector lock fails
+Requirement: G05.FR.01
+Steps:
+  1. Ensure the charging cable is plugged into the Charging Station connector (connector status = Occupied).
+  2. Ensure the Charging Station has the ConnectorPlugRetentionLock component defined in its Device Model.
+  3. Ensure MonitoringLevel is set such that connector lock event failures are reported.
+  4. The EV Driver presents credentials and authorization succeeds (either locally or via CSMS).
+  5. The Charging Station attempts to lock the connector retention lock.
+  6. The lock attempt fails (simulate or observe a hardware-level lock failure).
+  7. Observe whether the Charging Station initiates a charging transaction.
+Expected Result:
+  The Charging Station does NOT start a charging transaction.
+  No energy transfer begins.
+  The transaction state remains not-started (no TransactionEventRequest with eventType = Started is sent).
+
+--------------------------------------------------------------------------------
+
+TC-G05-002
+Title: Charging Station sends NotifyEventRequest with correct fields after lock failure
+Requirement: G05.FR.02 (precondition: G05.FR.01)
+Steps:
+  1. Ensure the charging cable is plugged in (connector status = Occupied).
+  2. Ensure the Charging Station has the ConnectorPlugRetentionLock component defined in its Device Model.
+  3. Ensure MonitoringLevel is set such that connector lock event failures are reported.
+  4. The EV Driver presents credentials and authorization succeeds.
+  5. The Charging Station attempts to lock the connector retention lock.
+  6. The lock attempt fails.
+  7. Capture all messages sent from the Charging Station to the CSMS immediately after the failure.
+Expected Result:
+  The Charging Station sends a NotifyEventRequest message to the CSMS.
+  The message contains:
+    - component = ConnectorPlugRetentionLock
+    - variable = Problem
+    - actualValue (or equivalent value field) = true
+  No charging transaction is started before or after this message is sent.
+
+--------------------------------------------------------------------------------
+
+TC-G05-003
+Title: CSMS responds to NotifyEventRequest with NotifyEventResponse
+Requirement: G05.FR.03 (precondition: G05.FR.02)
+Steps:
+  1. Ensure the charging cable is plugged in (connector status = Occupied).
+  2. Ensure the Charging Station has the ConnectorPlugRetentionLock component defined in its Device Model.
+  3. Ensure MonitoringLevel is set such that connector lock event failures are reported.
+  4. The EV Driver presents credentials and authorization succeeds.
+  5. The lock attempt fails, causing the Charging Station to send a NotifyEventRequest (component = ConnectorPlugRetentionLock, variable = Problem, value = true).
+  6. Observe the CSMS response to the NotifyEventRequest.
+Expected Result:
+  The CSMS sends a NotifyEventResponse back to the Charging Station.
+  The response corresponds to the same message ID as the NotifyEventRequest.
+  No error or timeout occurs in place of the response.
+
+--------------------------------------------------------------------------------
+
+TC-G05-004
+Title: Charging Station may display a notification to the EV Driver on lock failure
+Requirement: G05.FR.04 (precondition: G05.FR.01)
+Steps:
+  1. Ensure the charging cable is plugged in (connector status = Occupied).
+  2. Ensure the Charging Station has the ConnectorPlugRetentionLock component defined in its Device Model.
+  3. Ensure MonitoringLevel is set such that connector lock event failures are reported.
+  4. The EV Driver presents credentials and authorization succeeds.
+  5. The lock attempt fails.
+  6. Observe the Charging Station's display or any notification mechanism directed at the EV Driver.
+Expected Result:
+  The Charging Station MAY show a notification to the EV Driver indicating the cable cannot be locked.
+  If a notification is shown, it must be displayed after the lock failure occurs and before or alongside the NotifyEventRequest being sent.
+  If no notification is shown, this is also conformant behavior (the requirement is optional).
+  In either case, the absence or presence of the notification does not affect the mandatory behaviors defined in G05.FR.01 through G05.FR.03.
+
+================================================================================
+END OF TEST CASES
+================================================================================

@@ -1,0 +1,84 @@
+C14 - Online Authorization through Local Authorization List for more information on how to implement / use the Local Authorization
+List functionality.
+NOTE
+Please note the difference between the Authorization Cache and Local Authorization List mechanisms: the
+Authorization Cache is an autonomous mechanism at the Charging Station, whereas the Local Authorization List
+is a list that is synchronized between CSMS and Charging Station (originating from the CSMS).
+NOTE
+The Authorization Cache and Local Authorization List are distinct logical data structures. When both
+Authorization Cache as well as Local Authorization List are supported, a Charging Station SHALL treat Local
+Authorization List entries as having priority over Authorization Cache entries for the same identifiers.
+The following Configuration Variables are used by the Charging Station to give information about the Local Authorization List
+• LocalAuthListEntries (Also reports the maximum amount of IdTokens in the Local Authorization List)
+• LocalAuthListEnabled
+• LocalAuthListAvailable
+• ItemsPerMessageSendLocalList
+• BytesPerMessageSendLocalList
+1.5. Unknown Offline Authorization
+When offline, a Charging Station MAY allow automatic authorization of any "unknown" identifiers that are not found in the Local
+Authorization List and/or Authorization Cache. Operation of the Unknown Offline Authorization capability, when supported, is
+reported (and controlled, where possible) by the OfflineTxForUnknownIdEnabled Configuration Variable. When connection to
+the CSMS is restored, the Charging Station has to send the queued TransactionEventRequest messages. These may contain
+transactions that were authorized offline, as explained in transaction-related message handling. Please refer to C14 - Online Authorization through Local Authorization List
+Table 85. C14 - Online Authorization through Local Authorization List
+No. Type Description
+1 Name Online Authorization through Local Authorization List
+2 ID C14
+Functional block C. Authorization
+3 Objective(s) To authorize an idToken by using the Local Authorization List while Online.
+4 Description This use case describes how to authorize an IdToken via the Local Authorization List while the
+Charging Station is online. When online the Charging Station can then locally authorize the
+IdToken, and is not required to send an AuthorizeRequest for a known IdToken.
+Actors EV Driver, Charging Station
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 102/471 Part 2 - Specification
+No. Type Description
+Scenario description 1. The EV Driver presents IdToken
+2. The Charging Station checks if the IdToken is known and has status Accepted in the Local
+Authorization List.
+3. If the IdToken is not known, or the IdToken is not Accepted the Charging Station sends an
+AuthorizeRequest
+4. The Charging Station starts charging.
+5 Prerequisite(s) Local Authorization List is available
+Local Authorization List is enabled via LocalAuthListEnabled
+The Id of the EV Driver is in the Local Authorization List
+Id is valid LocalPreAuthorize is set to true
+6 Postcondition(s) Successful postcondition:
+The Charging Station accepts tokens on the Local Authorization List.
+Failure postcondition:
+The Charging Station does not accept tokens on the Local Authorization List.
+EV Driver
+Charging StationCSMS
+Present IdToken
+check local authorization list()
+[cached tariff: 0.23/kWh]
+alt[IdToken not known or IdToken status not Accepted]
+AuthorizeRequest(IdToken)
+AuthorizeResponse(Accepted)
+opt
+notification
+[tariff: 0.23/kWh]
+lock connector
+start energy offer
+Figure 35. Sequence Diagram: Online Authorization through Local Authorization List
+7 Error handling n/a
+8 Remark(s) n/a
+C14 - Online Authorization through Local Authorization List - Requirements
+Table 86. C14 - Requirements
+ID Precondition Requirement definition
+C14.FR.01 Where both Authorization Cache and Local Authorization List are
+supported, a Charging Station SHALL treat Local Authorization
+List entries as having priority over Authorization Cache entries
+for the same identifiers.
+C14.FR.02 Identifiers presented is in the Local
+Authorization List with a status Accepted
+The Charging Station SHALL start charging without sending an
+AuthorizeRequest.
+C14.FR.03 Identifiers presented is in the Local
+Authorization List with a status OTHER than
+Accepted
+The Charging Station SHALL send an AuthorizeRequest to try to
+authorize this IdToken.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 103/471 Part 2 - Specification
+2.6. Offline Authorization

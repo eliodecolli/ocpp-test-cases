@@ -1,0 +1,116 @@
+B05 - Set Variables
+Table 43. B05 - Set Variables
+No. Type Description
+1 Name Set Variables
+2 ID B05
+Functional block B. Provisioning
+3 Objective(s) To give the CSMS the ability to make changes to variables in the Charging Station.
+4 Description A Charging Station can have a lot of variables that can be configured/changed by the CSMS. A
+CSMS can use these variables to for example influence the behavior of a Charging Station. This
+use case describes how the CSMS requests a Charging Station to set the value of variables of a
+component. The CSMS can request to set more than one value per request.
+Actors CSMS, Charging Station
+Scenario description 1. The CSO triggers the CSMS to request setting one or more variables in a Charging Station.
+2. The CSMS sends a SetVariablesRequest to the Charging Station.
+3. The Charging Station responds with a SetVariablesResponse indicating whether it was able to
+executed the change(s).
+5 Prerequisite(s) n/a
+6 Postcondition(s) Successful postconditions:
+1. The change was executed Successfully. 
+Failure postconditions:
+1. The variable is supported, but setting could not be changed, the Charging Station responds with
+the status Rejected.
+2. The variable is not supported, the Charging Station responds with the status UnknownVariable.
+CSO
+CSMS Charging Station
+request to set one or more variables
+SetVariablesRequest(setVariableData)
+SetVariablesResponse(setVariableResult)
+Figure 14. Sequence Diagram: Set Variables
+7 Error handling n/a
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 53/471 Part 2 - Specification
+8 Remark(s) The attributeType Actual corresponds with the actual value of the Variable, whereas the
+attributeTypes Target, MinSet and MaxSet correspond to the target, minimum and maximum
+values that have been set for this variable.
+This is best explained by an example: the cooling system is configured to operate with a fan
+speed between 1000 and 5000 rpm. These boundaries are represented by the MinSet and MaxSet
+attributes. The current fan speed is represented by the Actual attribute. The desired fan speed is
+represented by the Target attribute.
+B05 - Set Variables - Requirements
+Table 44. B05 - Requirements
+ID Precondition Requirement definition
+B05.FR.01 When the Charging Station receives a
+SetVariablesRequest with an X number of
+SetVariableData elements
+The Charging Station SHALL respond with an
+SetVariablesResponse with an equal (X) number of
+SetVariableResult elements, one for every SetVariableData
+element in the SetVariablesRequest.
+B05.FR.02 B05.FR.01 Every SetVariableResult element in the SetVariablesResponse
+SHALL contain the same component and variable combination
+as one of the SetVariableData elements in the
+SetVariablesRequest.
+B05.FR.03 B05.FR.02
+AND
+If the SetVariablesRequest contains an
+attributeType
+The corresponding SetVariableResult element in the
+SetVariablesResponse SHALL also contain the same
+attributeType
+B05.FR.04 When the Charging Station receives a
+SetVariablesRequest with an unknown
+Component in the SetVariableData
+The Charging Station SHALL set the attributeStatus field in the
+corresponding SetVariableResult to: UnknownComponent.
+B05.FR.05 When the Charging Station receives a
+SetVariablesRequest with a Variable that is
+unknown for the given Component in the
+SetVariableData
+The Charging Station SHALL set the attributeStatus field in the
+corresponding SetVariableResult to: UnknownVariable.
+B05.FR.06 When the Charging Station receives a
+SetVariablesRequest with an attributeType that
+is unknown for the given Variable in the
+SetVariableData
+The Charging Station SHALL set the attributeStatus field in the
+corresponding SetVariableResult to: NotSupportedAttributeType.
+B05.FR.07 When the Charging Station receives a
+SetVariablesRequest with a value that is
+incorrectly formatted for the given Variable in
+the SetVariableData
+The Charging Station SHALL set the attributeStatus field in the
+corresponding SetVariableResult to: Rejected. (More information
+can be provided in the optional statusInfo element.)
+B05.FR.08 When the Charging Station receives a
+SetVariablesRequest with a value that is lower
+or higher than the range of the given Variable in
+the SetVariableData
+The Charging Station SHALL set the attributeStatus field in the
+corresponding SetVariableResult to: Rejected. (More information
+can be provided in the optional statusInfo element.)
+B05.FR.09 NOT (B05.FR.04 to B05.FR.08) AND
+When the Charging Station receives a
+SetVariablesRequest for a Variable in the
+SetVariableData, but is not able to set it
+The Charging Station SHALL set the attributeStatus field in the
+corresponding SetVariableResult to: Rejected.
+(This happens if the variable is ReadOnly, but may also occur
+when setting the variable fails because of technical problems.)
+B05.FR.10 When the Charging Station was able to set the
+given value from the SetVariableData
+The Charging Station SHALL set the attributeStatus field in the
+corresponding SetVariableResult to: Accepted.
+B05.FR.11 The CSMS SHALL NOT send more SetVariableData elements in a
+SetVariablesRequest than reported by the Charging Station via
+ItemsPerMessageSetVariables.
+B05.FR.12 When the Charging Station receives a
+SetVariablesRequest without an attributeType.
+The corresponding SetVariableResult element in the
+SetVariablesResponse SHALL contain the attributeType Actual.
+B05.FR.13 The CSMS SHALL NOT include multiple SetVariableData
+elements, in a single SetVariablesRequest, with the same
+Component, Variable and AttributeType combination. Note that
+an omitted AttributeType counts as the value Actual.
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 54/471 Part 2 - Specification

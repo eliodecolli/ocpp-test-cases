@@ -1,0 +1,70 @@
+N03 - Set Monitoring Base
+Table 218. N03 - Set Monitoring Base
+No. Type Description
+1 Name Set Monitoring Base
+2 ID N03
+Functional block N. Diagnostics
+3 Objective(s) To give the CSMS the ability to request the Charging Station to activate a set of preconfigured
+monitoring settings, as denoted by the value of MonitoringBase.
+4 Description This use case describes how the CSMS requests the Charging Station to activate a set of
+preconfigured monitoring settings, as denoted by the value of MonitoringBase. It is up to the
+manufacturer of the Charging Station to define which monitoring settings are activated by All,
+FactoryDefault and HardWiredOnly.
+Actors Charging Station, CSMS, CSO
+Scenario description 1. The CSO triggers the CSMS to request a Charging Station to set a monitoring base.
+2. The CSMS sends a SetMonitoringBaseRequest to the Charging Station.
+3. The Charging Station responds with a SetMonitoringBaseResponse.
+5 Prerequisite(s) Charging Station supports Monitoring
+6 Postcondition(s) The Charging Station activated the set of monitoring settings, as denoted by the value of
+MonitoringBase.
+Edition 2 FINAL, 2022-12-15 N. Diagnostics
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 320/471 Part 2 - Specification
+CSO CSMS Charging Station
+request to set a monitoring base
+SetMonitoringBaseRequest(monitoringBase)
+SetMonitoringBaseResponse(status)
+Figure 134. Sequence Diagram: Set Monitoring Base
+7 Error handling n/a
+8 Remark(s) Upon receipt of a SetMonitoringBaseRequest for HardWiredOnly or FactoryDefault the
+Charging Station will discard of any previously configured custom monitors and will activate the
+monitoring settings that are related to given MonitoringBase.
+For a MonitoringBase = All the Charging Station will activate all pre-configured monitors and
+leave previously configured custom monitors intact. This includes the custom monitors that were
+created when changing an existing pre-configured monitor.
+When the set of pre-configured monitors for All and FactoryDefault is the same, then the
+difference between the two is, that with FactoryDefault all custom monitors are deleted
+before the factory default pre-configured monitors are restored.
+N03 - Set Monitoring Base - Requirements
+Table 219. N03 - Requirements
+ID Precondition Requirement definition
+N03.FR.01 When the Charging Station accepts a
+setMonitoringBaseRequest
+Then the Charging Station SHALL send a
+setMonitoringBaseResponse with Accepted.
+N03.FR.02 When the Charging Station receives a
+setMonitoringBaseRequest for a not supported
+monitoringBase
+Then the Charging Station SHALL send a
+setMonitoringBaseResponse with NotSupported.
+N03.FR.03 N03.FR.01 AND
+When the Charging Station received a
+setMonitoringBaseRequest with monitoringBase
+All
+Then the Charging Station SHALL activate all preconfigured
+monitoring whilst leaving all installed custom monitors
+(including changed preconfigured monitors) intact.
+N03.FR.04 N03.FR.01 AND
+When the Charging Station received a
+setMonitoringBaseRequest with monitoringBase
+FactoryDefault
+Then the Charging Station SHALL delete all custom monitors
+(including overruled pre-configured monitors) and activate the
+default monitoring settings as recommended by the
+manufacturer.
+N03.FR.05 N03.FR.01 AND
+When the Charging Station received a
+setMonitoringBaseRequest with monitoringBase
+HardWiredOnly
+Then the Charging Station SHALL clear all custom and disable all
+pre-configured monitors. Only hard-wired monitors remain
+active.

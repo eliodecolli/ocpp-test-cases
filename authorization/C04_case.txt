@@ -1,0 +1,283 @@
+C04 - Authorization using PIN-code
+Test Cases
+================================================================================
+
+Protocol Summary:
+When a Charging Station has a PIN-code (KeyCode) entry terminal, the EV driver
+enters their PIN. The Charging Station sends an AuthorizeRequest to the CSMS
+with IdTokenEnumType set to KeyCode. The CSMS validates the PIN and responds
+with an AuthorizeResponse indicating whether the PIN is accepted or not.
+
+================================================================================
+TEST CASE 1: Valid PIN-code from an authorized driver
+--------------------------------------------------------------------------------
+Title:       Successful authorization with a valid PIN-code
+
+Description:
+An EV driver who is allowed to charge at the Charging Station enters their
+correct PIN-code. The CSMS recognizes it as valid and grants authorization.
+
+Steps:
+1. The EV driver approaches a Charging Station that has a PIN-code entry terminal.
+2. The driver enters their valid PIN-code into the terminal.
+3. The Charging Station sends an AuthorizeRequest to the CSMS with the
+   IdTokenEnumType field set to KeyCode and the driver's PIN as the token value.
+4. The CSMS receives the AuthorizeRequest and validates the PIN-code.
+5. The CSMS finds the PIN-code valid and the driver is permitted to charge at
+   this specific Charging Station.
+6. The CSMS sends an AuthorizeResponse back to the Charging Station.
+
+Expected Result:
+The AuthorizeResponse contains status = Accepted. The Charging Station proceeds
+to allow the driver to start or stop charging. (Requirement C04.FR.02)
+
+================================================================================
+TEST CASE 2: Invalid PIN-code entered by the driver
+--------------------------------------------------------------------------------
+Title:       Authorization denied for an unknown or invalid PIN-code
+
+Description:
+An EV driver enters a PIN-code that is not recognized or is not valid at the
+Charging Station. The CSMS rejects the authorization request.
+
+Steps:
+1. The EV driver approaches a Charging Station that has a PIN-code entry terminal.
+2. The driver enters a PIN-code that does not exist or is not valid at this
+   Charging Station.
+3. The Charging Station sends an AuthorizeRequest to the CSMS with the
+   IdTokenEnumType field set to KeyCode and the entered PIN as the token value.
+4. The CSMS receives the AuthorizeRequest and validates the PIN-code.
+5. The CSMS finds the PIN-code is not valid at this Charging Station.
+6. The CSMS sends an AuthorizeResponse back to the Charging Station.
+
+Expected Result:
+The AuthorizeResponse contains status = Invalid. The Charging Station denies
+the driver access and does not allow charging to begin or stop. (Requirement
+C04.FR.01)
+
+================================================================================
+TEST CASE 3: Valid PIN-code but driver not allowed at this Charging Station
+--------------------------------------------------------------------------------
+Title:       Authorization denied when driver is not permitted at this station
+
+Description:
+An EV driver enters a PIN-code that exists in the system but the driver is not
+authorized to charge at this particular Charging Station (e.g., it belongs to
+a different network or the driver's access rights are restricted to other
+stations).
+
+Steps:
+1. The EV driver approaches a Charging Station with a PIN-code entry terminal.
+2. The driver enters a PIN-code that is known to the CSMS but is not authorized
+   for use at this specific Charging Station.
+3. The Charging Station sends an AuthorizeRequest to the CSMS with
+   IdTokenEnumType = KeyCode.
+4. The CSMS receives the request. The PIN is recognized but the driver is not
+   allowed to charge at this station.
+5. The CSMS sends an AuthorizeResponse back to the Charging Station.
+
+Expected Result:
+The AuthorizeResponse contains status = Invalid (the driver is not allowed to
+charge at this station). The Charging Station denies access. (Requirement
+C04.FR.01)
+
+================================================================================
+TEST CASE 4: PIN-code is not logged
+--------------------------------------------------------------------------------
+Title:       PIN-code must not appear in any system log
+
+Description:
+Since a PIN-code (KeyCode) is sensitive credentials, the protocol mandates that
+it must never appear in any log output — neither on the Charging Station nor in
+the CSMS.
+
+Steps:
+1. The EV driver enters their PIN-code into the terminal.
+2. The Charging Station sends an AuthorizeRequest to the CSMS with the PIN-code
+   as the IdToken of type KeyCode.
+3. The CSMS processes the request and responds.
+4. Inspect all logs produced by the Charging Station during and after this
+   interaction (communication logs, debug logs, audit logs, etc.).
+5. Inspect all logs produced by the CSMS during and after this interaction.
+
+Expected Result:
+The PIN-code value does not appear in any log entry on the Charging Station or
+on the CSMS. Any logging of the transaction references only opaque identifiers
+or masks the token value entirely. (Requirement C04.FR.04)
+
+================================================================================
+TEST CASE 5: Authorization Cache stores a valid KeyCode
+--------------------------------------------------------------------------------
+Title:       Charging Station optionally caches a valid PIN-code
+
+Description:
+After a successful authorization, the Charging Station may store the KeyCode in
+its local Authorization Cache. A subsequent authorization request with the same
+PIN while the CSMS is temporarily unreachable can then be served from the cache.
+
+Steps:
+1. The driver enters a valid PIN-code and receives an Accepted response (as in
+   Test Case 1), with the Charging Station's Authorization Cache enabled.
+2. The Charging Station stores the KeyCode in the Authorization Cache.
+3. The CSMS becomes temporarily unavailable (network disruption).
+4. The same driver enters their PIN-code again.
+5. The Charging Station cannot reach the CSMS and checks its local
+   Authorization Cache.
+6. The Charging Station finds the cached KeyCode entry and evaluates its status.
+
+Expected Result:
+If the cached entry is still valid, the Charging Station grants authorization
+locally using the cached result, allowing the driver to charge without waiting
+for CSMS connectivity to be restored. Caching KeyCodes is permitted but not
+mandatory. (Requirement C04.FR.03)
+
+================================================================================
+TEST CASE 6: Brute-force protection — repeated incorrect PIN attempts
+--------------------------------------------------------------------------------
+Title:       System applies increasing backoff after repeated wrong PIN entries
+
+Description:
+An attacker or a driver who has forgotten their PIN repeatedly enters incorrect
+PIN-codes. The system should implement measures — such as increasing wait times
+between attempts — to prevent brute-force discovery of valid codes.
+
+Steps:
+1. A person enters an incorrect PIN-code at the terminal.
+2. The Charging Station sends an AuthorizeRequest; the CSMS responds with
+   status = Invalid.
+3. The person immediately enters another incorrect PIN-code.
+4. Repeat steps 2-3 for several consecutive failed attempts (e.g., 5 or more).
+5. After each failed attempt, observe whether the system introduces a delay
+   before allowing the next attempt or before processing the next request.
+
+Expected Result:
+After repeated failed attempts, the system enforces an increasing backoff period
+(delay) before accepting or processing the next entry. The delay grows with
+each subsequent failure, making automated brute-force attacks impractical.
+(Requirement C04.FR.06)
+
+================================================================================
+TEST CASE 7: AuthorizeRequest uses correct IdTokenEnumType = KeyCode
+--------------------------------------------------------------------------------
+Title:       Charging Station correctly sets the token type to KeyCode
+
+Description:
+When the driver uses a PIN-code terminal, the Charging Station must set the
+IdTokenEnumType field specifically to KeyCode (not to any other token type such
+as ISO14443 or Central). This ensures the CSMS interprets and validates the
+token correctly.
+
+Steps:
+1. The EV driver enters their PIN-code at a Charging Station with a PIN terminal.
+2. The Charging Station constructs an AuthorizeRequest message.
+3. Inspect the AuthorizeRequest message sent to the CSMS (e.g., via protocol
+   capture or integration test tooling).
+4. Check the IdTokenEnumType field in the message.
+
+Expected Result:
+The IdTokenEnumType field is set to KeyCode. The CSMS receives and processes the
+request treating the token as a PIN-code / key code. Any other token type value
+would be incorrect and must not be used for PIN-code authorization. (Requirement
+in scenario description step 2)
+
+================================================================================
+TEST CASE 8: Driver uses PIN to stop an active charging session
+--------------------------------------------------------------------------------
+Title:       Valid PIN-code is used to stop an ongoing charging session
+
+Description:
+The protocol states the driver can use the PIN-code to start or stop charging.
+This test verifies the stop-charging path works the same way as the start path.
+
+Steps:
+1. An EV is currently charging at the Charging Station (an active session exists).
+2. The EV driver enters their valid PIN-code into the terminal to stop the
+   session.
+3. The Charging Station sends an AuthorizeRequest to the CSMS with
+   IdTokenEnumType = KeyCode.
+4. The CSMS validates the PIN-code and confirms the driver is authorized.
+5. The CSMS responds with an AuthorizeResponse containing status = Accepted.
+6. The Charging Station stops the active charging session.
+
+Expected Result:
+The session is terminated successfully. The AuthorizeResponse contains status =
+Accepted and the Charging Station ends the charging session for the driver.
+
+================================================================================
+TEST CASE 9: Driver uses PIN to stop a session they did not start
+--------------------------------------------------------------------------------
+Title:       Authorization denied when PIN does not match the active session owner
+
+Description:
+An EV driver enters their valid PIN-code to stop a charging session, but the
+active session was started by a different driver. Depending on the CSMS business
+logic, the request may be rejected.
+
+Steps:
+1. Driver A is actively charging at the Charging Station (session started by
+   Driver A's PIN).
+2. Driver B walks up and enters their own (valid) PIN-code on the terminal,
+   intending to stop the session.
+3. The Charging Station sends an AuthorizeRequest for Driver B's PIN.
+4. The CSMS validates the request and determines that Driver B's PIN is not the
+   owner of the current session and is not authorized to stop it.
+5. The CSMS responds to the Charging Station.
+
+Expected Result:
+The CSMS responds with a status that does not allow Driver B to stop Driver A's
+session (e.g., status = Invalid or another non-Accepted status). The session
+continues uninterrupted for Driver A. The exact behavior depends on CSMS
+business rules, but unauthorized session termination by a different driver must
+be prevented.
+
+================================================================================
+TEST CASE 10: CSMS unavailable when driver enters PIN
+--------------------------------------------------------------------------------
+Title:       Authorization fails gracefully when CSMS is unreachable
+
+Description:
+The Charging Station sends an AuthorizeRequest but cannot reach the CSMS due to
+a network or system outage. The test verifies that the Charging Station handles
+this gracefully and does not grant unauthorized access.
+
+Steps:
+1. The CSMS is taken offline or network connectivity between the Charging Station
+   and CSMS is severed.
+2. The EV driver enters their PIN-code at the terminal.
+3. The Charging Station attempts to send an AuthorizeRequest to the CSMS.
+4. The Charging Station receives no response (timeout or connection error).
+5. The Charging Station checks whether a cached entry for this KeyCode exists in
+   its Authorization Cache.
+
+Expected Result:
+If no valid cached entry exists, the Charging Station does not authorize the
+driver and must not allow charging to begin (fail-safe behavior). If a valid
+cached entry exists (see Test Case 5), the Charging Station may use that cached
+result to authorize locally. In neither case does the PIN-code appear in any log.
+
+================================================================================
+TEST CASE 11: Language tag format compliance
+--------------------------------------------------------------------------------
+Title:       Language tags used in associated messages conform to RFC-5646
+
+Description:
+Requirement C04.FR.05 states that any language specification in messages related
+to this use case must use RFC-5646 format tags (e.g., "en-US" for US English).
+This test verifies that any language fields are correctly formatted.
+
+Steps:
+1. Trigger an authorization interaction that includes a language-tagged field
+   in the CSMS request or response (for example, a user-facing message or a
+   display text returned by the CSMS).
+2. Inspect the language tag value in the relevant field of the message.
+3. Verify the tag format against RFC-5646 conventions (e.g., primary language
+   subtag followed by optional region subtag, separated by a hyphen: "en-US",
+   "fr-FR", "de-DE").
+
+Expected Result:
+All language tags in messages are valid RFC-5646 formatted strings. No
+non-standard or free-form language identifiers are used. (Requirement C04.FR.05)
+
+================================================================================
+End of Test Cases
+================================================================================

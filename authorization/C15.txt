@@ -1,0 +1,372 @@
+C15 - Unknown
+Offline Authorization for the options that the Charging Station has to continue / stop the transaction in this situation.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 72/471 Part 2 - Specification
+2. Use cases & Requirements
+2.1. Authorization options
+C15 - Unknown Offline Authorization
+5 Prerequisite(s) n/a
+6 Postcondition(s) Successful postcondition:
+The EV Driver is authorized and can start or stop charging.
+Failure postcondition:
+If the authorize message is Invalid, Blocked, Expired or Unknown, the EV Driver can not start or
+stop charging, except in the case where the EV Driver presents the same token used to start the
+transaction.
+EV Driver
+Charging StationCSMS
+present RFID(AA12345)
+AuthorizeRequest(idToken(id = AA12345, type = ISO14443))
+AuthorizeResponse(...)
+opt
+notification
+Figure 22. Sequence Diagram: EV Driver Authorization
+7 Error handling When the Authorization is not 'Accepted', the AuthorizeResponse contains an authorization status
+value indicating the reason for rejection.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 73/471 Part 2 - Specification
+8 Remark(s) Assuming idToken is valid for charging and the Charging Station has 3 EVSEs, what is the content
+of idTokenInfo, when idToken is allowed to charge:
+. at all EVES: idTokenInfo.status = Accepted.
+. at EVSE 1: idTokenInfo.status = Accepted, idTokenInfo.evseId = [ 1 ].
+. at EVSE 1 + 2: idTokenInfo.status = Accepted, idTokenInfo.evseId = [ 1, 2 ].
+. at none of the EVSEs: _idTokenInfo.status=NotAtThisLocation.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 74/471 Part 2 - Specification
+C15 - Unknown Offline Authorization
+5 Prerequisites Charging Station has a start button, instead of an RFID reader to start charging of an EV.
+6 Postcondition(s) Transaction ongoing on Charging Station, CSMS is aware of transaction.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 77/471 Part 2 - Specification
+EV DriverCharging StationCSMS
+Plugin cable
+StatusNotificationRequest(Occupied)
+StatusNotificationResponse()
+TransactionEventRequest(eventType = Started,...)
+TransactionEventResponse(...)
+Press Start Button
+opt[if cable not permanently attached]
+lock connector
+Start energy offer
+TransactionEventRequest(eventType = Updated,
+idToken.type = NoAuthorization,...)
+TransactionEventResponse(idTokenInfo.status = Accepted,...)
+Unplug cable
+Figure 23. Sequence Diagram: Authorization using a start button
+7 Error Handling n/a
+8 Remarks The start button might also be a mechanical key or something similar.
+Note that the start button can even be omitted if the Charging Station is configured to start
+charging upon cable connection.
+The scenario description and sequence diagram above are based on the Configuration Variable
+for start transaction being configured as follows:
+TxStartPoint: EVConnected, Authorized, DataSigned, PowerPathClosed, EnergyTransfer
+This use-case is also valid for other configurations, but then the transaction might start/stop at
+another moment, which might change the sequence in which message are send. For more details
+see the use case: E01 - Start Transaction options.
+C15 - Unknown Offline Authorization
+5 Prerequisites Charging Station has a credit/debit card terminal, or belongs to a group of Charging Stations that
+has a central payment terminal, to start charging of an EV.
+6 Postcondition(s) Transaction ongoing on Charging Station
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 79/471 Part 2 - Specification
+EV Driver
+Charging StationCS-001 CSMS Payment System
+Plugin cable
+StatusNotificationRequest(Occupied)
+StatusNotificationResponse()
+TransactionEventRequest(eventType = Started, transactionId = AB1234,timestamp, evse.id = 1,evse.connectorId = 1, meterValues)
+TransactionEventResponse(...)
+use card
+financialtransaction
+authorized(TransactionReference = 1234,CS = CS-001, EVSE = 1)
+generate unique id()result = 4444
+RequestStartTransactionRequest(evseId = 1idToken(id = 4444, type = Central)
+RequestStartTransactionResponse(Accepted)
+opt[if cable not permanently attached]
+lock connector
+Start energy offer
+TransactionEventRequest(eventType = Updated, transactionId = AB1234,seqNo = 1, timestamp, chargingState = Charging,trigger = Authorized, idToken(id = 4444, type = Central))
+TransactionEventResponse(idTokenInfo.status = Accepted)
+Figure 24. Sequence Diagram: Authorization using credit/debit card
+7 Error Handling n/a
+8 Remarks This use case is an example of how the existing OCPP messages can be used to handle a
+transaction that is started with a credit/debit card, it is not required to implement a credit/debit
+card payment solution in this way.
+A Payment System may consist of multiple components handling the authorization of the user.
+The interface of these components and the communication between the Payment System and
+CSMS are not in scope of this document.
+Stopping a transaction started with a credit/debit card is not defined, this is left to the
+implementer, this could for example be: Unplugging the cable on the EV side and/or a stop button
+etc.
+The scenario description and sequence diagram above are based on the Configuration Variable
+for start transaction being configured as follows:
+TxStartPoint: EVConnected, Authorized, DataSigned, PowerPathClosed, EnergyTransfer
+This use-case is also valid for other configurations, but then the transaction might start/stop at
+another moment, which might change the sequence in which message are send. For more details
+see the use case: E01 - Start Transaction options.
+C15 - Unknown Offline Authorization
+5 Prerequisites Charging Station has a PIN-code entry terminal to start charging of an EV.
+6 Postcondition(s) Transaction ongoing on Charging Station, CSMS is aware of transaction.
+EV DriverCharging StationCSMS
+enter pin-code(1234)
+AuthorizeRequest(idToken(id = 1234,
+type = PinCode), ...)
+AuthorizeResponse(idTokenInfo.status = Accepted, ...)
+opt
+notification
+Figure 25. Sequence Diagram: Authorization using PIN-code
+7 Error Handling n/a
+8 Remarks When the PIN-code is validated in the Charging Station, instead of the CSMS, use case C15 - Unknown Offline Authorization
+5 Prerequisites Cable is plugged in.
+6 Postcondition(s) Transaction ongoing on Charging Station
+EV DriverAPP
+Charging Station
+CS-001 CSMS
+Transaction already started
+at cable plug-in
+Start Charging
+Start Charging (CS-001)
+determine unique id()
+result = 4444
+RequestStartTransactionRequest(evseId = 1
+idToken(id = 4444, type = Central))
+RequestStartTransactionResponse(Accepted)
+TransactionEventRequest(eventType = Updated, transactionId = AB1234,
+evse.id = 1, evse.connectorId = 1,
+meterValues, timestamp)
+TransactionEventResponse(...)
+Figure 26. Sequence Diagram: Authorization for CSMS initiated transactions
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 84/471 Part 2 - Specification
+7 Error Handling n/a
+8 Remarks IdTokens MAY be (single use) virtual transaction authorization codes or virtual RFID tokens that
+deliberately use a non-standard UID format to avoid possible conflict with real UID values. These
+virtual single use IdTokens are sent with type Central and it is pointless to either cache or
+authorize these tokens.
+This use case uses an App as example, but this is not a requirement. This use case is valid for
+any RequestStartTransactionRequest with a server generated IdToken.
+The scenario description and sequence diagram above are based on the Configuration Variable
+for start transaction being configured as follows:
+TxStartPoint: EVConnected, Authorized, DataSigned, PowerPathClosed, EnergyTransfer
+This use-case is also valid for other configurations, but then the transaction might start/stop at
+another moment, which might change the sequence in which message are send. For more details
+see the use case: E01 - Start Transaction options.
+This use case assumes that the configuration variable AuthorizeRemoteStart is false. See use
+cases F01 and F02 for requirements with AuthorizeRemoteStart.
+Other idTokenTypes can also be used to remote start charging, such an eMAID of the user that is
+provided by the app.
+C15 - Unknown Offline Authorization
+5 Prerequisites Integrated parking & charging payment system
+6 Postcondition(s) The transaction has completed at the Charging Station and Transaction information is available
+at the CSMS.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 86/471 Part 2 - Specification
+EV DriverPayment TerminalCharging StationCSMS
+Plugin cable
+StatusNotificationRequest(Occupied)
+StatusNotificationResponse()
+TransactionEventRequest(eventType = Started, ...)
+TransactionEventResponse(...)
+present parking ticket(1234)
+AuthorizeRequest(idToken(id = 1234, type = Local))
+AuthorizeResponse(...)
+optnotification
+Start Charging
+TransactionEventRequest(eventType = Updated, transactionId = AB1234,chargingState = Charging, trigger = Authorized, idToken.id = 1234, meterValues, ...)
+TransactionEventResponse(idTokenInfo.status = Accepted, ...)
+User returns to pick up EV
+present parkingticket(1234)
+stop charging(id = 1234)
+Match ticketIdwith TransactionId()
+RequestStopTransactionRequest(transactionId = AB1234)
+RequestStopTransactionResponse(Accepted)
+TransactionEventRequest(eventType = Updated, transactionId = AB1234,chargingState = EVConnected, trigger = RemoteStop, idToken.id = 1234, meterValues, ...)
+TransactionEventResponse(...)
+get cost(id = 1234)
+pay for parkingand charging
+optnotification
+Unplug cable
+StatusNotificationRequest(Available)
+StatusNotificationResponse()
+TransactionEventRequest(eventType = Ended, transactionId = AB1234, meterValues, ...)
+TransactionEventResponse(...)
+Figure 27. Sequence Diagram: Authorization using local id type
+7 Error Handling n/a
+8 Remarks This use case uses an Parking Ticket as example, but this is not a requirement.
+The communication between the Payment Terminal and the CSMS is outside of scope of OCPP.
+The scenario description and sequence diagram above are based on the Configuration Variable
+for start & stop transaction being configured as follows:
+TxStartPoint: Authorized, DataSigned, PowerPathClosed, EnergyTransfer
+TxStopPoint: ParkingBayOccupancy, EVConnected
+This use-case is also valid for other configurations, but then the transaction might start/stop at
+another moment, which might change the sequence in which message are send. For more details
+see the use cases: E01 - Start Transaction options and E06 - Stop Transaction options.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 87/471 Part 2 - Specification
+C15 - Unknown Offline Authorization
+5 Prerequisites A contract Certificate is installed in the EV.
+6 Postcondition(s) The validity of the Contract Certificate is determined.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 89/471 Part 2 - Specification
+EV Charging StationCSMS(Sub)CA
+ServiceDiscoveryReq()
+ServiceDiscoveryRes(PaymentServiceList: Contract, ExternalPayment)
+PaymentServiceSelectionReq(paymentOption: Contract)
+PaymentServiceSelectionRes()
+alt[Cached certificate checking]PaymentDetailsReq(ContractCertificateChain, EMAID)
+AuthorizeRequest(idToken.EMAID, iso15118CertificateHashData[0..4])
+check certificate cache()
+AuthorizeResponse(idTokenInfo, certificateStatus)
+PaymentDetailsRes(GenChallenge)
+AuthorizationReq(GenChallenge)
+AuthorizationRes(EVSEProcessing, ResponseCode)
+[Real-time certificate checking]PaymentDetailsReq(ContractCertificateChain, EMAID)
+AuthorizeRequest(idToken.EMAID, iso15118CertificateHashData[0..4])
+OCSP request()
+PaymentDetailsRes(GenChallenge)
+AuthorizationReq(GenChallenge)
+OCSP response()
+AuthorizeResponse(idTokenInfo, certificateStatus)
+AuthorizationRes(EVSEProcessing, ResponseCode)
+Figure 28. Authorization using Contract Certificates
+7 Error handling
+8 Remark(s) In edition 1 of 15118, the message timeout of the PaymentDetailsReq/Res message is 5 seconds.
+In case certificate verification cannot be completed in that time it is possible to complete this
+during the AuthorizationReq/Res, which can be extended up to 60 seconds.
+When the Charging Station is offline, it is recommended to omit the payment option for ISO 15118
+contract certificates from the ServiceDiscoveryRes and revert to External Identification Means
+(use case C08), because certificate status cannot be checked.
+C15 - Offline Authorization of unknown Id.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 91/471 Part 2 - Specification
+C15 - Unknown Offline Authorization
+5 Prerequisites Communication between EV and EVSE SHALL be established successfully.
+6 Postcondition(s) Authorization is successful. Also see ISO15118-1, use case End conditions D4, page 28.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 92/471 Part 2 - Specification
+EV Charging Station CSMS
+Identify first
+User might identify prior to connecting the EV to the EVSE
+AuthorizeRequest(idToken)
+AuthorizeResponse(idTokenInfo)
+ServiceDiscoveryReq()
+ServiceDiscoveryRes(PaymentServiceList: ExternalPayment)
+PaymentServiceSelectionReq(paymentOption: ExternalPayment)
+PaymentServiceSelectionRes()
+AuthorizationReq()
+Identify after plugin
+User might identify after plugging in, sequence time-out is 60 seconds
+AuthorizeRequest(idToken)
+AuthorizeResponse(idTokenInfo)
+AuthorizationRes()
+Figure 29. Sequence Diagram: Authorization at EVSE using external credentials performed with help of SA.
+7 Remark(s) Please note that all identification means mentioned in the previous section can be applied to this
+use case. The only difference is the availability of 15118 communication.
+Source: ISO15118-1
+C15 - Offline Authorization of unknown Id
+Table 87. C15 - Offline Authorization of unknown Id
+No. Type Description
+1 Name Offline Authorization of unknown Id
+2 ID C15
+Functional block C. Authorization
+Parent use case C15 - Offline Authorization of unknown Id - Requirements
+Table 88. C15 - Requirements
+ID Precondition Requirement definition Note
+C15.FR.01 If the identifier is authorized via
+OfflineTxForUnknownIdEnabled
+The Charging Station SHALL NOT add the token to
+Authorization Cache
+C15.FR.02 When connection to the CSMS is
+restored
+The Charging Station SHALL send a
+TransactionEventRequest for any transaction that
+was authorized offline.
+As explained in
+transaction-related
+message handling
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 105/471 Part 2 - Specification
+ID Precondition Requirement definition Note
+C15.FR.03 C15.FR.02 AND
+The authorization status in
+TransactionEventResponse is not
+Accepted AND
+The transaction is still ongoing AND
+StopTxOnInvalidId is true AND
+TxStopPoint does NOT contain:
+(Authorized OR PowerPathClosed OR
+EnergyTransfer)
+The Charging Station SHALL stop the energy
+transfer and send TransactionEventRequest
+(eventType = Updated) with triggerReason set to
+Deauthorized and chargingState set to
+SuspendedEVSE or preferably to EVConnected.
+Since the effect of
+setting chargingState to
+SuspendedEVSE or
+EVConnected both have
+the same effect of not
+delivering any energy, the
+use of SuspendedEVSE
+is still allowed in this
+situation in order to avoid
+breaking existing
+implementations that
+adhere to the original
+requirement.
+Use of SuspendedEVSE
+in this situation will
+become deprecated in
+the next OCPP release.
+C15.FR.04 C15.FR.02 AND
+The authorization status in
+TransactionEventResponse is not
+Accepted AND
+The transaction is still ongoing AND
+StopTxOnInvalidId is true AND
+TxStopPoint does contain:
+(Authorized OR PowerPathClosed OR
+EnergyTransfer)
+The Charging Station SHALL stop the transaction
+and send TransactionEventRequest (eventType =
+Ended) with triggerReason set to Deauthorized and
+stoppedReason set to DeAuthorized.
+C15.FR.05 C15.FR.04 AND
+If the Charging Station has the
+possibility to lock the Charging Cable
+The Charging Station SHOULD keep the Charging
+Cable locked until the owner presents his identifier.
+C15.FR.06 C15.FR.02 AND
+The authorization status in
+TransactionEventResponse is not
+Accepted AND
+The transaction is still ongoing AND
+StopTxOnInvalidId is set to false
+AND
+MaxEnergyOnInvalidId is not
+implemented or has been exceeded.
+TxStopPoint does NOT contain:
+EnergyTransfer
+The Charging Station SHALL stop the energy
+delivery to the EV immediately and send
+TransactionEventRequest (eventType = Updated)
+with triggerReason set to ChargingStateChanged
+and chargingState set to SuspendedEVSE
+C15.FR.07 C15.FR.02 AND
+The authorization status in
+TransactionEventResponse is not
+Accepted AND
+The transaction is still ongoing AND
+StopTxOnInvalidId is set to false
+AND
+MaxEnergyOnInvalidId is set and
+has NOT been exceeded.
+Energy delivery to the EV SHALL be allowed until
+the amount of energy specified in
+MaxEnergyOnInvalidId has been reached.
+C15.FR.08 When an unknown identifier is
+presented AND
+OfflineTxForUnknownIdEnabled is set
+to true
+The Charging Station SHALL accept the presented
+IdToken.
+2.7. Master Pass

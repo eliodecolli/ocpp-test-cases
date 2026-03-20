@@ -1,0 +1,66 @@
+C07 - Authorization using Contract Certificates
+C07 - Authorization using Contract Certificates
+C07 - Authorization using Contract Certificates
+C07 - Authorization using Contract Certificates
+C07 - Authorization using Contract Certificates
+C07 - Authorization using Contract Certificates
+C07 - Authorization using Contract Certificates
+Table 71. C07 - Authorization using Contract Certificates
+No. Type Description
+1 Name Authorization using Contract Certificates
+2 ID C07
+Functional block C. Authorization
+Reference ISO15118-1 D2
+3 Objectives See ISO15118-1, use case Objective D2, page 26.
+4 Description See ISO15118-1, use case Description D2 (first bullet), page 26.
+Actors Actors: EV, Charging Station, CSMS, OCSP
+Scenario description 15118:
+See ISO15118-1, use case Description D2, Scenario Description, first 2 bullets, page 26.
+OCPP:
+3. The Charging Station sends an AuthorizeRequest message to the CSMS containing the eMAID
+and data needed for an OCSP request with regards to the contract certificate and certificate
+chain.
+4. The CSMS replies with an agreement or non-agreement, and the certificate status.
+5. Service starts after successful authorization of the IDs.
+Alternative scenario(s) C07 - Authorization using Contract Certificates - Requirements
+Table 72. C07 - Requirements
+ID Precondition Requirement definition
+C07.FR.01 When Charging Station is online The Charging Station SHALL send an AuthorizeRequest to the
+CSMS for validation.
+C07.FR.02 C07.FR.01 The AuthorizeRequest SHALL contain the eMAID and data
+needed for an OCSP request with regards to the contract
+certificate and certificate chain.
+C07.FR.04 If the CSMS receives an AuthorizeRequest. It SHALL respond with an AuthorizeResponse and SHALL include
+an authorization status value indicating acceptance or a reason
+for rejection.
+C07.FR.05 C07.FR.02 The CSMS SHALL verify validity of the certificate and certificate
+chain via real-time or cached OCSP data using the hash data
+provided in iso15118CertificateHashData field.
+C07.FR.06 C07.FR.01 AND
+If Charging Station is not able to validate a
+contract certificate, because it does not have
+the associated root certificate AND
+CentralContractValidationAllowed is
+true
+The Charging Station SHALL pass the contract certificate chain
+to the CSMS in certificate attribute (in PEM format) of
+AuthorizeRequest for validation by CSMS.
+C07.FR.07 When Charging Station is offline AND
+ContractValidationOffline is false
+The Charging Station SHALL NOT allow charging.
+C07.FR.08 When Charging Station is offline AND
+ContractValidationOffline is true
+The Charging Station SHALL try to validate the contract
+certificate locally.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 90/471 Part 2 - Specification
+ID Precondition Requirement definition
+C07.FR.09 C07.FR.08 AND
+Contract certificate is valid AND
+LocalAuthorizeOffline is true
+The Charging Station SHALL lookup the eMAID in Local
+Authorization List or Authorization Cache.
+C07.FR.10 C07.FR.09 AND
+eMAID found in Local Authorization List
+The Charging Station SHALL behave according to use case C07 - Authorization using Contract Certificates
+C07 - Authorization using Contract Certificates

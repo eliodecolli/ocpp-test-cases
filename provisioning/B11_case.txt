@@ -1,0 +1,121 @@
+B11 - Reset - Without Ongoing Transaction - Test Cases
+
+GOAL: Allow the CSMS to request a Charging Station (or a specific EVSE) to reset itself when there are no ongoing transactions. The station responds with whether it can comply and reboots accordingly.
+
+================================================================================
+
+TEST CASE 1: Immediate reset of the full Charging Station — accepted, no transactions
+Scenario: CSMS requests an immediate reset when there are no ongoing transactions.
+Steps:
+  1. CSO triggers CSMS to reset the Charging Station.
+  2. CSMS sends ResetRequest(type = Immediate) to the Charging Station (no evseId supplied).
+  3. Charging Station responds.
+  4. Charging Station reboots.
+  5. Charging Station proceeds as per B01 (Cold Boot).
+Expected result:
+  - Charging Station responds with ResetResponse(status = Accepted).
+  - Charging Station may send StatusNotification(Unavailable) before rebooting.
+  - Charging Station reboots and reconnects per B01.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 2: OnIdle reset of the full Charging Station — no transactions
+Scenario: CSMS requests an OnIdle reset when there are no transactions running.
+Steps:
+  1. CSMS sends ResetRequest(type = OnIdle) with no evseId.
+  2. Charging Station has no active transactions.
+  3. Charging Station responds and reboots immediately (nothing to wait for).
+Expected result:
+  - Charging Station responds with ResetResponse(status = Accepted).
+  - Charging Station reboots and reconnects per B01.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 3: Reset is rejected — station is busy and cannot interrupt
+Scenario: Charging Station cannot reset at this time (e.g., firmware update in progress that cannot be interrupted).
+Steps:
+  1. CSMS sends ResetRequest.
+  2. Charging Station has an uninterruptible operation in progress.
+Expected result:
+  - Charging Station responds with ResetResponse(status = Rejected).
+  - No reboot occurs.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 4: Reset is scheduled — station cannot reset right now but will later
+Scenario: Charging Station cannot reset immediately but will do so when it can.
+Steps:
+  1. CSMS sends ResetRequest.
+  2. Charging Station cannot reset now but has scheduled the reset for later.
+Expected result:
+  - Charging Station responds with ResetResponse(status = Scheduled).
+  - Reboot occurs when the station reaches an appropriate state.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 5: Unavailable status persists after reboot
+Scenario: An EVSE was set to Inoperative (Unavailable) by the CSMS before the reset.
+Steps:
+  1. CSMS previously set the EVSE to Unavailable via ChangeAvailability.
+  2. CSMS sends ResetRequest.
+  3. Charging Station reboots.
+Expected result:
+  - After reboot, the EVSE remains in Unavailable state.
+  - The Unavailable status is persistent across reboots.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 6: Reserved status persists after reboot
+Scenario: An EVSE had Reserved status before the reset.
+Steps:
+  1. An EVSE was in Reserved state before the reboot.
+  2. CSMS sends ResetRequest; Charging Station reboots.
+Expected result:
+  - After reboot, the EVSE returns to Reserved state.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 7: Reset a specific EVSE (evseId supplied) — Accepted
+Scenario: CSMS requests a reset of a single EVSE rather than the whole station.
+Steps:
+  1. CSMS sends ResetRequest with an evseId parameter (no transactions on that EVSE).
+  2. Charging Station responds.
+  3. Charging Station reboots that EVSE only.
+Expected result:
+  - Charging Station responds with ResetResponse(status = Accepted).
+  - Charging Station may send StatusNotification(Unavailable) for that EVSE.
+  - Only the specified EVSE is rebooted; the rest of the station continues operating.
+  - B01 flow applies only to the full station reset, not individual EVSE reset.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 8: Reset a specific EVSE — station does not support individual EVSE reset
+Scenario: CSMS supplies an evseId, but the Charging Station does not support resetting individual EVSEs.
+Steps:
+  1. CSMS sends ResetRequest with an evseId.
+  2. Charging Station does not support individual EVSE resets.
+Expected result:
+  - Charging Station responds with ResetResponse(status = Rejected).
+
+--------------------------------------------------------------------------------
+
+TEST CASE 9: Charging Station advertises individual EVSE reset support via AllowReset
+Scenario: A station that supports individual EVSE resets should indicate this in its device model.
+Steps:
+  1. Check the device model variable AllowReset on the EVSE component.
+Expected result:
+  - If the station supports individual EVSE resets, AllowReset is set to true for the EVSE.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 10: CSMS optionally notifies CSO after reset is confirmed
+Scenario: After receiving ResetResponse, the CSMS may send an optional notification to the CSO.
+Steps:
+  1. CSMS sends ResetRequest.
+  2. Charging Station responds with ResetResponse.
+  3. CSMS optionally notifies the CSO.
+Expected result:
+  - The CSO notification (if sent) reflects the result received from the Charging Station.
+  - The absence of a CSO notification is not a failure.
+
+--------------------------------------------------------------------------------

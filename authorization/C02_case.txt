@@ -1,0 +1,346 @@
+C02 - Authorization Using a Start Button
+Test Cases
+==========================================================================
+
+OVERVIEW
+--------
+This protocol (C02) covers the scenario where a Charging Station uses a
+physical start button instead of an RFID reader to begin charging. Because
+no user identification is required, no AuthorizeRequest is sent. Instead,
+the Charging Station sends a TransactionEventRequest with IdTokenType set
+to NoAuthorization and an empty idToken field. The CSMS must always accept
+this token type.
+
+
+==========================================================================
+TC-C02-001: Happy Path - Full Successful Charging Session via Start Button
+==========================================================================
+
+Title:
+  Normal start-button charging session completes without errors.
+
+Scenario:
+  An EV Driver plugs in a cable and presses the start button. The Charging
+  Station initiates charging without any RFID authentication, notifies the
+  CSMS with NoAuthorization, and the CSMS accepts the session.
+
+Steps:
+  1. The EV Driver plugs the charging cable into the Charging Station.
+  2. Verify the Charging Station sends a StatusNotificationRequest to the
+     CSMS to report the cable being connected.
+  3. Verify the Charging Station sends a TransactionEventRequest with
+     eventType = Started to notify the CSMS that a transaction has begun.
+  4. The EV Driver presses the physical start button on the Charging
+     Station.
+  5. Verify the Charging Station begins delivering power to the EV.
+  6. Verify the Charging Station sends a TransactionEventRequest with
+     eventType = Updated, IdTokenType = NoAuthorization, and idToken field
+     set to an empty string.
+  7. Verify the CSMS responds with a TransactionEventResponse containing
+     IdTokenInfo.status = Accepted.
+
+Expected Result:
+  Charging proceeds normally. The CSMS accepts the session without
+  requiring any user identification. No AuthorizeRequest is sent at any
+  point during the session.
+
+
+==========================================================================
+TC-C02-002: CSMS Receives NoAuthorization - Must Respond with Accepted
+==========================================================================
+
+Title:
+  CSMS always responds with Accepted when it receives NoAuthorization
+  token type.
+
+Scenario:
+  Confirm that the CSMS is not permitted to reject a TransactionEvent that
+  carries an IdTokenType of NoAuthorization. The requirement C02.FR.02
+  states this response is mandatory.
+
+Steps:
+  1. Simulate the Charging Station sending a TransactionEventRequest
+     (eventType = Updated) to the CSMS with the following values:
+       - IdTokenType = NoAuthorization
+       - idToken = "" (empty string)
+  2. Observe the CSMS response.
+
+Expected Result:
+  The CSMS responds with TransactionEventResponse where
+  IdTokenInfo.status = Accepted. The CSMS must not return any other status
+  (e.g., Invalid, Blocked, Unknown) for this token type.
+
+
+==========================================================================
+TC-C02-003: No AuthorizeRequest Is Sent During Start-Button Session
+==========================================================================
+
+Title:
+  Start-button session does not trigger an AuthorizeRequest.
+
+Scenario:
+  Because the Charging Station has no RFID reader and uses a button, there
+  is no user token to authorize. Confirm that the Charging Station skips
+  the authorization step entirely.
+
+Steps:
+  1. The EV Driver plugs in the cable and presses the start button.
+  2. Monitor all messages sent from the Charging Station to the CSMS
+     throughout the session.
+  3. Check whether any AuthorizeRequest message was sent at any point.
+
+Expected Result:
+  No AuthorizeRequest message is sent during the entire session. The
+  Charging Station goes directly from cable connection to sending
+  TransactionEventRequest (eventType = Started), then presses start and
+  sends TransactionEventRequest (eventType = Updated) with
+  NoAuthorization.
+
+
+==========================================================================
+TC-C02-004: idToken Field Is Empty in NoAuthorization Request
+==========================================================================
+
+Title:
+  The idToken field in the TransactionEventRequest must be empty when
+  using NoAuthorization.
+
+Scenario:
+  Requirement C02.FR.01 states that when a start button initiates a
+  transaction, the idToken field must be left empty (empty string). Verify
+  this is enforced.
+
+Steps:
+  1. The EV Driver plugs in the cable and presses the start button.
+  2. Capture the TransactionEventRequest (eventType = Updated) sent by the
+     Charging Station.
+  3. Inspect the message payload for the IdToken field.
+
+Expected Result:
+  The IdToken field in the TransactionEventRequest is present but contains
+  an empty string. IdTokenType is set to NoAuthorization. No token value
+  (such as an RFID UID) is populated.
+
+
+==========================================================================
+TC-C02-005: NoAuthorization Token Info Is Not Stored in Authorization Cache
+==========================================================================
+
+Title:
+  A Charging Station with an Authorization Cache must not cache
+  NoAuthorization token responses.
+
+Scenario:
+  Requirement C02.FR.03 prohibits storing IdTokenInfo received for an
+  IdTokenType of NoAuthorization in the Authorization Cache. This prevents
+  polluting the cache with meaningless entries.
+
+Steps:
+  1. Use a Charging Station that has the Authorization Cache feature
+     enabled.
+  2. Complete a full start-button charging session. The CSMS returns
+     TransactionEventResponse with IdTokenInfo.status = Accepted for the
+     NoAuthorization token.
+  3. After the session, inspect the Authorization Cache contents on the
+     Charging Station.
+
+Expected Result:
+  The Authorization Cache does not contain any entry associated with the
+  NoAuthorization IdTokenType or the empty idToken. The cache is unchanged
+  from before the session.
+
+
+==========================================================================
+TC-C02-006: StatusNotificationRequest Sent After Cable Plug-In
+==========================================================================
+
+Title:
+  Charging Station reports connector status change when cable is plugged
+  in.
+
+Scenario:
+  Before charging starts, the Charging Station must notify the CSMS of the
+  new connector state via a StatusNotificationRequest.
+
+Steps:
+  1. The EV Driver plugs the charging cable into the Charging Station.
+  2. Monitor messages sent from the Charging Station to the CSMS
+     immediately after plug-in.
+  3. Check that a StatusNotificationRequest is sent before the
+     TransactionEventRequest (eventType = Started).
+
+Expected Result:
+  The Charging Station sends a StatusNotificationRequest reflecting the
+  updated connector status (e.g., Occupied or Preparing) before or
+  alongside the TransactionEventRequest (eventType = Started).
+
+
+==========================================================================
+TC-C02-007: Start Button Pressed Before Cable Is Plugged In
+==========================================================================
+
+Title:
+  Driver presses start button before plugging in the cable.
+
+Scenario:
+  Edge case where the EV Driver presses the start button before connecting
+  the charging cable. The Charging Station should not initiate a
+  transaction in this state since there is no EV connected.
+
+Steps:
+  1. Ensure no cable is connected to the Charging Station.
+  2. The EV Driver presses the physical start button.
+  3. Observe what the Charging Station does (messages sent, physical
+     state).
+
+Expected Result:
+  The Charging Station does not initiate a transaction or send a
+  TransactionEventRequest. No charging begins. The Charging Station may
+  display an error or instruction to connect the cable first. No
+  NoAuthorization token request is sent to the CSMS.
+
+
+==========================================================================
+TC-C02-008: Cable Disconnected Before Start Button Is Pressed
+==========================================================================
+
+Title:
+  EV Driver unplugs the cable before pressing the start button.
+
+Scenario:
+  After plugging in, the driver changes their mind and unplugs before
+  pressing start. The Charging Station should cancel or not begin the
+  transaction.
+
+Steps:
+  1. The EV Driver plugs the charging cable into the Charging Station.
+  2. The Charging Station sends StatusNotificationRequest and
+     TransactionEventRequest (eventType = Started).
+  3. Before the driver presses the start button, the driver unplugs the
+     cable.
+  4. Observe the messages sent by the Charging Station.
+
+Expected Result:
+  The Charging Station sends a TransactionEventRequest (eventType = Ended)
+  or an appropriate status update to the CSMS. No NoAuthorization token
+  event is sent. No charging takes place.
+
+
+==========================================================================
+TC-C02-009: CSMS Is Offline When TransactionEventRequest (Updated) Is Sent
+==========================================================================
+
+Title:
+  CSMS is unreachable when the Charging Station sends the
+  NoAuthorization transaction update.
+
+Scenario:
+  Network connectivity is lost after the cable is plugged in and the
+  driver presses the start button. The Charging Station should handle the
+  offline state gracefully and still allow charging to proceed locally if
+  the local authorization policy permits it.
+
+Steps:
+  1. The EV Driver plugs in the cable.
+  2. Network connectivity between the Charging Station and CSMS is
+     interrupted.
+  3. The EV Driver presses the start button.
+  4. The Charging Station attempts to send TransactionEventRequest
+     (eventType = Updated) with NoAuthorization but receives no response.
+  5. Observe whether charging begins and how the Charging Station handles
+     the missing response.
+
+Expected Result:
+  If the Charging Station is configured to allow offline charging, charging
+  begins locally without waiting for the CSMS response. The
+  TransactionEventRequest is queued and sent to the CSMS once connectivity
+  is restored. The CSMS then responds with IdTokenInfo.status = Accepted.
+
+
+==========================================================================
+TC-C02-010: Multiple Consecutive Start-Button Sessions
+==========================================================================
+
+Title:
+  Two successive start-button charging sessions are handled independently
+  and correctly.
+
+Scenario:
+  After the first session ends, a second EV Driver plugs in and presses
+  the start button. Verify that each session is tracked independently and
+  that the cache (if present) is not affected by either session.
+
+Steps:
+  1. Complete a full start-button charging session (plug in, press start,
+     charge, end session, unplug).
+  2. A second EV Driver plugs in a cable and presses the start button.
+  3. Verify the Charging Station sends a fresh TransactionEventRequest
+     (eventType = Started) and then (eventType = Updated) with
+     NoAuthorization for the second session.
+  4. Verify the CSMS returns IdTokenInfo.status = Accepted for the second
+     session.
+
+Expected Result:
+  Both sessions are treated independently. Each generates its own
+  transaction with the correct NoAuthorization token type. The
+  Authorization Cache (if enabled) remains unmodified by either session.
+  The CSMS accepts both sessions.
+
+
+==========================================================================
+TC-C02-011: Charging Station Without Authorization Cache - No Cache Impact
+==========================================================================
+
+Title:
+  Charging Station without an Authorization Cache processes
+  NoAuthorization normally, no cache-related side effects.
+
+Scenario:
+  C02.FR.03 applies only to Charging Stations that have implemented an
+  Authorization Cache. Verify that a Charging Station without this feature
+  simply processes the session normally without any cache-related behavior.
+
+Steps:
+  1. Use a Charging Station that does not have the Authorization Cache
+     feature.
+  2. Complete a full start-button charging session.
+  3. Confirm no cache-related errors or unexpected behavior occur.
+
+Expected Result:
+  The session completes normally. The Charging Station sends
+  TransactionEventRequest (eventType = Updated) with NoAuthorization, the
+  CSMS responds with Accepted, and no caching logic is triggered or
+  expected.
+
+
+==========================================================================
+TC-C02-012: CSMS Attempts to Reject NoAuthorization (Invalid CSMS Behavior)
+==========================================================================
+
+Title:
+  Verify the system handles a non-compliant CSMS that rejects
+  NoAuthorization.
+
+Scenario:
+  A non-compliant or misconfigured CSMS returns a status other than
+  Accepted for a NoAuthorization token. This is a violation of C02.FR.02.
+  This test verifies the Charging Station's behavior when faced with an
+  unexpected rejection.
+
+Steps:
+  1. Configure a test CSMS to respond to TransactionEventRequest with
+     NoAuthorization using IdTokenInfo.status = Invalid (or any non-
+     Accepted status).
+  2. The EV Driver plugs in and presses the start button.
+  3. The Charging Station sends TransactionEventRequest (eventType =
+     Updated) with NoAuthorization.
+  4. The test CSMS responds with IdTokenInfo.status = Invalid.
+  5. Observe the Charging Station's behavior.
+
+Expected Result:
+  This scenario represents a CSMS protocol violation. The expected
+  compliant behavior is that the CSMS always returns Accepted. The test
+  documents what the Charging Station does when it receives an unexpected
+  rejection, which may include logging an error, continuing to charge (as
+  NoAuthorization is inherently permitted), or surfacing an alert. The
+  Charging Station itself is not at fault in this scenario.

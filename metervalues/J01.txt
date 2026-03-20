@@ -1,0 +1,130 @@
+J01 - Sending Meter Values not related to a transaction
+Table 152. J01 - Sending Meter Values not related to a transaction
+No. Type Description
+1 Name Sending Meter Values not related to a transaction
+2 ID J01
+Functional block J. Meter Values
+3 Objective(s) To sample the electrical meter or other sensor/transducer hardware to provide information about
+the Charging Stations' Meter Values.
+4 Description The Charging Station samples the electrical meter or other sensor/transducer hardware to
+provide information about its Meter Values. Depending on configuration settings, the Charging
+Station will send Meter Values.
+Actors Charging Station, CSMS
+Scenario description 1. The Charging Station sends a MeterValuesRequest message, for offloading Meter Values to
+the CSMS.
+2. Upon receipt of a MeterValuesRequest message, the CSMS responds with a
+MeterValuesResponse message.
+5 Prerequisite(s) The Charging Station is configured to send Meter values every XX seconds.
+No transaction is running.
+6 Postcondition(s) Successful postcondition:
+n/a
+Failure postcondition:
+n/a
+Charging StationCSMS
+MeterValuesRequest(evseId, meterValue)
+MeterValuesResponse()
+Figure 92. Sequence Diagram: Sending Meter Values
+7 Error handling n/a
+8 Remark(s) The phase field is not applicable to all Measurands.
+The phase rotation of a Connector relative to the grid connection can be derived by querying the
+PhaseRotation Configuration Variables of all components in the chain from grid connection up
+to Connector.
+The nature of each sampledValue is determined by the optional Measurand, context, location, unit
+and phase fields.
+The optional SignedMeterValue field can contain digitally signed binary meter value data.
+Edition 2 FINAL, 2022-12-15 J. MeterValues
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 226/471 Part 2 - Specification
+J01 - Sending Meter Values not related to a transaction - Requirements
+Table 153. J01 - Requirements
+ID Precondition Requirement definition Note
+J01.FR.01 The Charging Station MAY sample the energy
+meter (or other sensor/transducer hardware) to
+provide extra information about its Meter Values.
+It is up to the Charging
+Station when it will send
+Meter Values. This can
+be configured using the
+SetVariablesRequest
+message to data
+acquisition intervals and
+specify data to be
+acquired & reported.
+J01.FR.02 The MeterValuesRequest message SHALL contain
+the id of the EVSE from which samples were taken.
+J01.FR.03 J01.FR.02 AND
+The evseId is 0.
+The MeterValuesRequest message SHALL be
+associated with the entire Charging Station.
+J01.FR.04 J01.FR.03 AND
+Measurand is energy related.
+The sample SHALL be taken from the main energy
+meter.
+J01.FR.05 If all captured at the same point in
+time.
+Each MeterValue element SHALL contain a
+timestamp.
+J01.FR.06 If all captured at the same point in
+time.
+Each MeterValue(s) element SHALL contain a set
+of one or more individual SampledValue elements.
+J01.FR.07 The optional measurand field SHALL specify the
+type of value being measured/reported.
+J01.FR.08 The optional context field SHALL specify the
+reason/event triggering the reading.
+J01.FR.09 The optional location field SHALL specify where the
+measurement is taken.
+(e.g. Inlet, Outlet).
+J01.FR.10 The optional phase field SHALL specify to which
+phase or phases of the electric installation the
+value applies.
+J01.FR.11 The Charging Station SHALL report all phase
+number dependent values from the electrical meter
+(or grid connection when absent) point of view.
+J01.FR.13 When reporting phase rotation of a
+component
+The Charging Station SHALL report the phase
+rotation relative to the grid connection
+J01.FR.14 When configured to send
+MeterValuesRequest, See: Meter
+Values - Configuration
+The Charging Station SHALL send
+MeterValuesRequest messages to the CSMS as
+configured.
+J01.FR.15 J01.FR.14
+AND
+Amount of measurands is too much
+for 1 MeterValuesRequest
+The Charging Station MAY use multiple
+MeterValuesRequest messages to send all
+measurands.
+J01.FR.17 The timestamp of a MeterValue SHALL apply to all
+its SampledValues.
+J01.FR.18 When CSMS receives a
+MeterValuesRequest
+CSMS SHALL respond with MeterValuesResponse. Failing to respond with
+MeterValuesResponse
+might cause the
+Charging Station to try
+the same message
+again.
+J01.FR.19 If AlignedDataSendDuringIdle is
+set to true for an EVSE AND
+the specified EVSE has an ongoing
+transaction.
+The Charging Station SHALL stop sending the clock
+aligned meter values for this EVSE.
+J01.FR.20 If AlignedDataSendDuringIdle is
+set to true for a Charging Station AND
+the Charging Station has an ongoing
+transaction.
+The Charging Station SHALL stop sending the clock
+aligned meter values for all EVSEs and the main
+power meter.
+Edition 2 FINAL, 2022-12-15 J. MeterValues
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 227/471 Part 2 - Specification
+ID Precondition Requirement definition Note
+J01.FR.21 AlignedDataSignReadings is true The Charging Station SHALL retrieve signed meter
+values from components that support data signing
+and put them in the signedMeterValue field.
+Edition 2 FINAL, 2022-12-15 J. MeterValues
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 228/471 Part 2 - Specification

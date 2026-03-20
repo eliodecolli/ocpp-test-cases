@@ -1,0 +1,66 @@
+B03 - Cold Boot Charging Station - Rejected
+5 Prerequisite(s) The Charging Station is powered down.
+6 Postcondition(s) Successful postcondition:
+The Charging Station is in Idle status, and Accepted.
+Failure postcondition:
+The Charging Station received the status Rejected, B03 - Cold Boot Charging Station -Rejected
+applies.
+The Charging Station received the status Pending, B03 - Cold Boot Charging Station -Rejected
+applies.
+CSMS Charging Station
+BootNotificationRequest(...)
+BootNotificationResponse(status =Pending, interval = X,...)
+opt
+GetVariablesRequest(...)
+GetVariablesResponse(...)
+opt
+SetVariablesRequest(...)
+SetVariablesResponse(...)
+loop[with interval X while "Pending"]
+BootNotificationRequest(...)
+BootNotificationResponse(status =Pending, interval = X,...)
+Continue B03 - Cold Boot Charging Station - Rejected
+Table 39. B03 - Cold Boot Charging Station - Rejected
+No. Type Description
+1 Name Cold Boot Charging Station - Rejected
+2 ID B03
+Functional block B. Provisioning
+Parent use case B03 - Cold Boot Charging Station - Rejected - Requirements
+Table 40. B03 - Requirements
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 50/471 Part 2 - Specification
+ID Precondition Requirement definition
+B03.FR.01 If the Charging Station is configured to accept
+Transactions before being accepted by a CSMS
+The Charging Station MAY allow locally authorized transactions.
+B03.FR.02 If the CSMS returns the status Rejected. For
+example when a Charging Station is blacklisted.
+The Charging Station SHALL NOT send any OCPP message to
+the CSMS until the retry interval has expired.
+B03.FR.03 While in the status Rejected. The CSMS SHALL NOT initiate any messages.
+B03.FR.04 B03.FR.03 The Charging Station MAY close the connection until it needs to
+send the next BootNotificationRequest.
+B03.FR.05 If the interval in the BootNotificationResponse
+equals 0, and the status is other than Accepted
+The Charging Station SHALL choose a waiting interval on its
+own, in a way that avoids flooding the CSMS with requests.
+B03.FR.06 If the interval in the BootNotificationResponse is
+greater than 0, and the status is other than
+Accepted
+The Charging Station SHALL send a BootNotificationRequest
+after the set interval has past.
+B03.FR.07 B03.FR.03
+AND
+Charging Station sends a message that is not a
+BootNotificationRequest
+CSMS SHALL respond with RPC Framework: CALLERROR:
+SecurityError.
+B03.FR.08 B03.FR.03
+AND
+CSMS sends a message that is not a
+TriggerMessageRequest(requestedMessage =
+BootNotification)
+Charging Station SHALL respond with RPC Framework:
+CALLERROR: SecurityError.
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 51/471 Part 2 - Specification

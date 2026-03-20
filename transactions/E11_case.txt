@@ -1,0 +1,131 @@
+E11 - Connection Loss During Transaction
+Test Cases
+================================================================================
+
+TC-E11-001
+Title: All TransactionEventRequest messages are queued while offline
+Requirement: E11.FR.01
+Steps:
+  1. Ensure a transaction is actively ongoing on the Charging Station.
+  2. Sever the network connection between the Charging Station and the CSMS (e.g., disconnect the network interface).
+  3. While the Charging Station is offline, trigger one or more transaction events (e.g., meter value sampling, status change).
+  4. Observe the Charging Station's internal message queue (via logs or diagnostic output).
+Expected Result:
+  Every TransactionEventRequest message that would have been sent to the CSMS during the offline period is retained in the Charging Station's outbound queue.
+  No TransactionEventRequest messages are discarded or silently dropped solely because the connection is unavailable.
+  The queue grows by one entry for each transaction event that occurs while offline.
+
+--------------------------------------------------------------------------------
+
+TC-E11-002
+Title: Queued TransactionEventRequest messages are sent with offline=TRUE after reconnection
+Requirement: E11.FR.02
+Steps:
+  1. Ensure a transaction is actively ongoing on the Charging Station.
+  2. Sever the network connection so that transaction events are queued during the offline period.
+  3. Trigger at least two transaction events while offline (e.g., periodic meter readings).
+  4. Restore the network connection between the Charging Station and the CSMS.
+  5. Observe the messages received by the CSMS after the connection is restored.
+Expected Result:
+  The Charging Station transmits each queued TransactionEventRequest to the CSMS after reconnection.
+  Every such message contains the field "offline" set to TRUE.
+  The messages are delivered in the order in which the events occurred.
+  No queued message is sent with offline set to FALSE or omitted.
+
+--------------------------------------------------------------------------------
+
+TC-E11-003
+Title: Meter data is included in TransactionEventRequest(eventType=Updated) when configured
+Requirement: E11.FR.03
+Steps:
+  1. Configure the Charging Station to include meter data in TransactionEventRequest messages with eventType = Updated (per the Meter Values configuration).
+  2. Specify at least one measurand in the configuration (e.g., Energy.Active.Import.Register).
+  3. Start a transaction and allow it to reach the periodic meter-value sampling interval.
+  4. Observe the TransactionEventRequest(eventType = Updated) messages sent to the CSMS (online or after reconnection).
+Expected Result:
+  Each TransactionEventRequest with eventType = Updated contains a populated "meterValue" field.
+  The meterValue field includes entries for every measurand that was configured.
+  The values and units in the meterValue field correspond to the actual readings at the sampling time.
+
+--------------------------------------------------------------------------------
+
+TC-E11-004
+Title: Intermediate Updated messages may be dropped when memory is low offline
+Requirement: E11.FR.04
+Steps:
+  1. Configure the Charging Station to include meter data in TransactionEventRequest(eventType = Updated).
+  2. Start a transaction and sever the network connection.
+  3. Simulate or provoke a low-memory condition on the Charging Station while it is offline.
+  4. Allow multiple TransactionEventRequest(eventType = Updated) messages to accumulate in the queue.
+  5. Observe which messages are retained and which are removed from the queue.
+Expected Result:
+  When the Charging Station is both offline and running low on memory, it is permitted (but not required) to drop one or more TransactionEventRequest(eventType = Updated) messages from its queue.
+  The Charging Station does not crash or halt; it continues to queue subsequent events.
+  No TransactionEventRequest with eventType = Started or eventType = Ended is dropped as a result of memory pressure.
+
+--------------------------------------------------------------------------------
+
+TC-E11-005
+Title: Intermediate (odd-indexed) Updated messages are dropped first when memory is low
+Requirement: E11.FR.05
+Steps:
+  1. Configure the Charging Station to include meter data in TransactionEventRequest(eventType = Updated).
+  2. Start a transaction and sever the network connection.
+  3. Simulate a low-memory condition so that the Charging Station must drop some Updated messages.
+  4. Allow at least five TransactionEventRequest(eventType = Updated) messages to be generated (label them internally 1st through 5th in arrival order).
+  5. Examine the queue contents or the messages later delivered to the CSMS to determine which were retained.
+Expected Result:
+  The Charging Station drops the 1st, 3rd, and 5th messages (odd-indexed intermediate messages) before dropping any even-indexed messages.
+  The Charging Station does not begin dropping messages from the head of the queue sequentially (i.e., it does not simply discard the oldest messages first).
+  The Charging Station does not stop accepting new Updated messages into the queue; it continues appending new events.
+  Messages with even positions (2nd, 4th) are retained longer than odd-position messages.
+
+--------------------------------------------------------------------------------
+
+TC-E11-006
+Title: Meter data may be split across multiple Updated messages with the same timestamp
+Requirement: E11.FR.06
+Steps:
+  1. Configure the Charging Station to sample a large number of measurands such that a single TransactionEventRequest(eventType = Updated) cannot hold all values within its payload size limits.
+  2. Start a transaction and allow a meter-value sampling interval to occur.
+  3. Observe the TransactionEventRequest(eventType = Updated) messages sent to the CSMS for that sampling instant.
+Expected Result:
+  The Charging Station is permitted to send more than one TransactionEventRequest(eventType = Updated) for a single sampling timestamp.
+  All such split messages carry the identical timestamp corresponding to the sampling moment.
+  Together, the split messages contain all configured measurands without omission.
+  Each individual message remains within the payload size constraints.
+
+--------------------------------------------------------------------------------
+
+TC-E11-007
+Title: All messages already in the queue are marked offline when the Charging Station goes offline
+Requirement: E11.FR.07
+Steps:
+  1. Start a transaction while the Charging Station is online.
+  2. Allow at least one TransactionEventRequest to be generated and placed in the outbound queue before it is sent (e.g., by introducing a brief artificial send delay or by examining queue state at the moment of disconnect).
+  3. Sever the network connection at a moment when one or more messages remain unsent in the queue.
+  4. Inspect the queued messages (via logs or diagnostic output).
+Expected Result:
+  Every TransactionEventRequest message that was already in the queue at the time the connection was lost has its "offline" flag set to TRUE.
+  No previously-queued message retains an offline value of FALSE after the go-offline event is detected.
+  Messages that were successfully acknowledged by the CSMS before the disconnect are unaffected.
+
+--------------------------------------------------------------------------------
+
+TC-E11-008
+Title: Signed meter values are placed in signedMeterValue field when SampledDataSignReadings is true
+Requirement: E11.FR.08
+Steps:
+  1. Set the configuration key "SampledDataSignReadings" to TRUE on the Charging Station.
+  2. Start a transaction.
+  3. Allow at least one meter-value sampling interval to elapse.
+  4. Observe the sampledValues entries within the TransactionEventRequest(eventType = Updated) messages sent to the CSMS.
+Expected Result:
+  The Charging Station retrieves signed meter values from the meter hardware or firmware.
+  Each sampledValue entry that carries a signed reading includes a populated "signedMeterValue" field.
+  The "signedMeterValue" field contains the cryptographic signature or signed data blob as provided by the meter.
+  No signed reading is placed in a generic value field in place of the signedMeterValue field.
+
+================================================================================
+END OF TEST CASES
+================================================================================

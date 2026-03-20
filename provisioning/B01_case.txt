@@ -1,0 +1,168 @@
+B01 - Cold Boot Charging Station - Test Cases
+
+GOAL: Enable a Charging Station that is powering up to register itself at the CSMS, provide configuration info, and resume normal operation. The CSMS controls which Charging Stations are accepted.
+
+================================================================================
+
+TEST CASE 1: Normal cold boot — CSMS accepts the station
+Scenario: Charging Station powers up and is accepted by the CSMS.
+Steps:
+  1. Power up the Charging Station.
+  2. Charging Station sends BootNotificationRequest (including version, vendor, and other config info).
+  3. CSMS responds with BootNotificationResponse(status = Accepted, currentTime, interval > 0).
+  4. Charging Station adjusts its heartbeat interval to the value from the response.
+  5. Charging Station sends StatusNotificationRequest for each Connector with its current state.
+  6. Charging Station starts sending HeartbeatRequests at the configured interval.
+Expected result:
+  - BootNotification is accepted.
+  - Heartbeat interval is updated to what CSMS returned.
+  - Status notifications are sent for all connectors.
+  - Heartbeats begin on schedule.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 2: Boot with optional Unavailable pre-check
+Scenario: Charging Station sends Unavailable status for connectors before completing self-check, then updates to real status.
+Steps:
+  1. Charging Station powers up.
+  2. Charging Station sends BootNotificationRequest; CSMS responds Accepted.
+  3. Charging Station sends StatusNotificationRequest(connectorStatus = Unavailable) for each connector.
+  4. Charging Station performs self-check.
+  5. Charging Station sends StatusNotificationRequest with actual status for each connector (Available or Unavailable/Reserved/Faulted if previously set).
+Expected result:
+  - Both rounds of StatusNotification are accepted by the CSMS.
+  - Final connector statuses reflect actual state.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 3: Connector was set to Unavailable before reboot — status persists
+Scenario: A connector was set to Unavailable via ChangeAvailability before the reboot.
+Steps:
+  1. Prior to boot: Connector was set to Unavailable.
+  2. Charging Station reboots and sends BootNotificationRequest; CSMS responds Accepted.
+  3. Charging Station sends StatusNotificationRequest for the connector.
+Expected result:
+  - The connector reports status Unavailable (not Available).
+  - Unavailable status is persistent across the reboot.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 4: EVSE was Reserved before reboot — Reserved status persists
+Scenario: An EVSE was Reserved before a reboot.
+Steps:
+  1. Prior to boot: EVSE had Reserved status.
+  2. Charging Station reboots and registers with CSMS.
+  3. Charging Station sends StatusNotificationRequest for the EVSE.
+Expected result:
+  - EVSE reports status Reserved.
+  - Reserved state is persistent across the reboot.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 5: Reboot after remote reset, firmware update, or power outage
+Scenario: Charging Station reboots for any reason and must re-register.
+Steps:
+  1. Charging Station reboots (any cause).
+  2. Charging Station sends BootNotificationRequest to CSMS.
+  3. CSMS responds.
+Expected result:
+  - A new BootNotificationRequest is sent on every boot/reboot, regardless of cause.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 6: BootNotification includes the reason field
+Scenario: Verify the Charging Station indicates why it is booting.
+Steps:
+  1. Charging Station powers up (or reboots).
+  2. Charging Station sends BootNotificationRequest.
+Expected result:
+  - The reason field is present and contains a valid BootReasonEnumType value.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 7: No messages sent before BootNotification is accepted
+Scenario: Charging Station must not send other OCPP messages before receiving Accepted.
+Steps:
+  1. Charging Station powers up.
+  2. Charging Station sends BootNotificationRequest.
+  3. CSMS has not yet responded (or responded with Pending/Rejected).
+  4. Charging Station attempts to send another OCPP message (not BootNotification, TriggerMessage, GetBaseReport, or GetReport).
+Expected result:
+  - The Charging Station does NOT send the other message.
+  - Any cached messages from prior sessions are held back.
+  - CSMS would respond with CALLERROR: SecurityError if such a message were sent.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 8: Time synchronization using CSMS time from BootNotification
+Scenario: Charging Station is configured to use Heartbeats / BootNotification for time synchronization.
+Steps:
+  1. Charging Station receives BootNotificationResponse with currentTime.
+  2. Charging Station is configured with TimeSource that includes CSMS.
+Expected result:
+  - Charging Station synchronizes its internal clock to the currentTime from the response.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 9: Security profile 3 — serial number in certificate must match request
+Scenario: CSMS validates that the serial number in the certificate matches the BootNotificationRequest.
+Steps:
+  1. Charging Station uses security profile 3 and sends BootNotificationRequest with its SerialNumber.
+  2. CSMS checks the SerialNumber against the Certificate Common Name.
+Expected result:
+  - If they match: normal processing continues.
+  - If they do NOT match: CSMS closes the WebSocket connection.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 10: No initial connection — retry
+Scenario: Charging Station cannot establish a connection to the CSMS on boot.
+Steps:
+  1. Charging Station powers up.
+  2. No connection can be established.
+Expected result:
+  - Charging Station retries the connection periodically.
+  - Charging Station does not flood the CSMS with repeated attempts.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 11: No response / timeout from CSMS
+Scenario: Charging Station sends BootNotificationRequest but gets no response.
+Steps:
+  1. Charging Station sends BootNotificationRequest.
+  2. CSMS does not respond within the timeout.
+Expected result:
+  - Charging Station resends BootNotificationRequest after a waiting interval.
+  - If no previous interval is known, Charging Station chooses a reasonable backoff interval.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 12: CSMS responds with Pending status
+Scenario: CSMS places the Charging Station in Pending status (not yet accepted).
+Steps:
+  1. Charging Station sends BootNotificationRequest.
+  2. CSMS responds with BootNotificationResponse(status = Pending, interval = X).
+  3. CSMS optionally sends GetVariables or SetVariables messages to configure the station.
+  4. Charging Station resends BootNotificationRequest after X seconds.
+Expected result:
+  - Charging Station enters Pending state.
+  - Charging Station responds to CSMS messages (GetVariables, SetVariables) during Pending.
+  - Communication channel remains open.
+  - Charging Station does not send other OCPP messages on its own.
+  - See B02 for full Pending behavior test cases.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 13: CSMS responds with Rejected status
+Scenario: CSMS rejects the Charging Station.
+Steps:
+  1. Charging Station sends BootNotificationRequest.
+  2. CSMS responds with BootNotificationResponse(status = Rejected, interval = X).
+  3. Charging Station waits X seconds and resends BootNotificationRequest.
+Expected result:
+  - Charging Station stays in Rejected state.
+  - Charging Station resends BootNotificationRequest after the specified interval.
+  - No transactions are accepted.
+  - See B03 for full Rejected behavior test cases.
+
+--------------------------------------------------------------------------------

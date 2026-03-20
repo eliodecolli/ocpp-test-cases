@@ -1,0 +1,46 @@
+C06 - Authorization using local id type
+C06 - Authorization using local id type
+C06 - Authorization using local id type
+C06 - Authorization using local id type
+C06 - Authorization using local id type
+C06 - Authorization using local id type
+This is an informative use case, its purpose is to demonstrate the use of the Local id type.
+Table 69. C06 - Authorization using local id type
+No. Type Description
+1 Name Authorization using local id type
+2 ID C06
+Functional block C. Authorization
+3 Objectives Enable the Charging Station to start charging with a locally generated IdToken.
+4 Description When a Charging Station needs to start a Transaction for a Driver that has no RFID, or the RFID is
+not known. For Example, the EV Driver uses a parking ticket to start charging.
+Actors EV Driver, Payment Terminal, CSMS, Charging Station
+Scenario description 1. An EV driver drives into a garage, takes a parking ticket at the barrier at the entrance.
+2. Parks his EV at a Charging Station.
+3. Plugs in the charging cable.
+4. Scans/inserts his parking ticket on the Charging Station to start Charging
+5. EV is charging, driver leaves.
+6. EV driver returns, inserts parking ticket into a payment kiosk
+7. Pays for parking and charging
+8. The Payment terminal/kiosk sends a stop command via the CSMS to the Charging Station.
+9. EV driver unplugs the charging cable and drives away.
+Alternative scenario(s) C06 - Authorization using local id type - Requirements
+Table 70. C06 - Authorization using local id type - Requirements
+ID Precondition Requirement definition
+C06.FR.01 The Charging Station SHALL only offer energy after
+authorization.
+C06.FR.02 If an IdTokenType with type Local is presented
+by the EV Driver.
+The Charging Station SHALL send AuthorizeRequest to the
+CSMS to request authorization.
+C06.FR.03 AuthorizeRequest SHOULD only be used for the authorization of
+an identifier for charging.
+C06.FR.04 If the CSMS receives an AuthorizeRequest. it SHALL respond with an AuthorizeResponse and SHALL include
+an authorization status value indicating acceptance or a reason
+for rejection.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 88/471 Part 2 - Specification
+2.2. ISO 15118 Authorization
+This authorization section originates from ISO15118-1 for the use of Plug & Charge functionalities.
+C06 - Authorization using local id type
+C06 - Authorization using local id type
+C06 - Authorization using local id type

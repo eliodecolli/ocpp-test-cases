@@ -1,0 +1,58 @@
+B09 - Setting a new NetworkConnectionProfile
+Table 51. B09 - Setting a new NetworkConnectionProfile
+No. Type Description
+1 Name Setting a new NetworkConnectionProfile.
+2 ID B09
+Functional block B. Provisioning
+3 Objectives To enable the CSMS to update the connection details on the Charging Station.
+4 Description The CSMS updates the connection details on the Charging Station. For instance in preparation of
+a migration to a new CSMS. After completion of this use case, the Charging Station to CSMS
+connection data has been updated.
+Actors Charging Station, CSMS
+Scenario description 1. The CSMS sends a SetNetworkProfileRequest PDU containing an updated connection profile
+2. The Charging Station receives the PDU, validates the content and stores the new data
+3. The Charging Station responds by sending a SetNetworkProfileResponse PDU, with status
+Accepted
+5 Prerequisites The data supplied by the CSMS matches the Charging Station’s capabilities
+6 Postcondition(s) The Charging Station was able to store the new connection data
+CSMS Charging Station
+SetNetworkProfileRequest(configurationSlot, connectionData)
+Set new credentials()
+SetNetworkProfileResponse(status: Accepted)
+Figure 18. Sequence Diagram: Set Network Connection Profile
+8 Error Handling Activation of a new NetworkConnectionProfile is described in B09 - Setting a new NetworkConnectionProfile - Requirements
+Table 52. B09 - Requirements
+ID Precondition Requirement definition
+B09.FR.01 On receipt of the SetNetworkProfileRequest The Charging Station SHALL validate the content, store the new
+data and if successful, respond by sending a
+SetNetworkProfileResponse message, with status Accepted
+B09.FR.02 On receipt of the SetNetworkProfileRequest The Charging Station SHALL validate the content. If the content
+is invalid, the Charging Station SHALL respond by sending a
+SetNetworkProfileResponse message, with status Rejected
+B09.FR.03 If setting the new networkprofile fails. The Charging Station SHALL respond by sending a
+SetNetworkProfileResponse message, with status Failed
+B09.FR.04 On receipt of the SetNetworkProfileRequest
+AND
+the NetworkConnectionProfile contains a lower
+securityProfile than stored at the configuration
+variable SecurityProfile
+The Charging Station SHALL respond by sending a
+SetNetworkProfileResponse message, with status Rejected
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 62/471 Part 2 - Specification
+B09 - Setting a new NetworkConnectionProfile was executed successfully prior to this
+use case
+The data supplied by the CSMS matches the Charging Station’s capabilities
+6 Postcondition(s) The Charging Station is connected via a different NetworkConnectionProfile.
+OperatorCSMS 1CSMS 2 Charging Station
+Change Network Config
+SetVariablesRequest(NetworkConfigurationPriority)
+SetVariablesResponse(status: RebootRequired)
+ResetRequest(OnIdle)
+ResetResponse(Accepted)
+Reboot
+BootNotificationRequest(...)
+BootNotificationResponse(...)
+Figure 19. Sequence Diagram: Migrate to new ConnectionProfile
+8 Error Handling n/a
+9 Remarks As in line with 

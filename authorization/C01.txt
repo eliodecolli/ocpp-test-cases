@@ -1,0 +1,221 @@
+C01 - EV Driver Authorization using RFID
+Table 59. C01 - EV Driver Authorization using RFID
+No. Type Description
+1 Name EV Driver Authorization using RFID
+2 ID C01
+Functional block C. Authorization
+3 Objective(s) To enable the Charging Station to request the CSMS to authorize an EV Driver to start or stop
+charging.
+4 Description When a Charging Station needs to charge an EV, it needs to authorize the EV Driver first before
+the charging can be started or stopped.
+Actors Charging Station, CSMS, EV Driver
+Scenario description 1. The EV Driver wants to start or stop charging the EV and presents an RFID card.
+2. The Charging Station sends AuthorizeRequest to the CSMS to request authorization.
+3. Upon receipt of AuthorizeRequest, the CSMS responds with AuthorizeResponse. This response
+message indicates whether or not the IdToken is accepted by the CSMS.
+Alternative scenario(s) C01 - EV Driver Authorization using RFID - Requirements
+Table 60. C01 - Requirements
+ID Precondition Requirement definition Note
+C01.FR.01 Configuration setting AuthEnabled is
+true.
+The Charging Station SHALL only offer energy after
+authorization.
+C01.FR.02 If an idToken presented by the EV
+Driver is not present in the Local
+Authorization List or Authorization
+Cache
+The Charging Station SHALL send
+AuthorizeRequest to the CSMS to request
+authorization.
+C01.FR.03 When an idToken is presented during
+a transaction that has been authorized
+AND
+(a) the presented idToken is the same
+as the idToken that started the
+authorization
+OR
+(b) when the presented idToken is in
+the Local Authorization List or
+Authorization Cache AND is valid AND
+has the same GroupIdToken as the
+IdToken that started the authorization.
+The Charging Station SHALL end the authorization
+of the transaction, without first sending an
+AuthorizeRequest
+The idToken that started
+the authorization can
+always be used to end
+the authorization.
+Ending authorization will
+end delivery of energy.
+Depending on the
+TxStopPoint ending of
+the authorization may
+also end the transaction.
+C01.FR.04 AuthorizeRequest SHALL only be used for the
+authorization of an identifier.
+C01.FR.05 If an IdToken is present in the Local
+Authorization List or Authorization
+Cache.
+The Charging Station MAY send AuthorizeRequest
+to the CSMS.
+C01.FR.06 When CSMS receives an
+AuthorizeRequest for an idToken AND
+the idToken has an associated
+groupIdToken.
+AuthorizeResponse sent by the CSMS to a Charging
+Station SHALL include the associated
+groupIdToken.
+C01.FR.07 AuthorizeResponse SHALL include an authorization
+status value indicating acceptance or a reason for
+rejection.
+See
+AuthorizationStatusEnu
+mType for the possible
+reasons of rejection.
+C01.FR.08 If the field: language1 is set AND the
+Charging Station contains messages
+in that language.
+The Charging Station SHALL show messages to the
+user in language1.
+C01.FR.09 If the field: language1 is set AND the
+Charging Station does not contain
+messages in that language AND if the
+field: language2 is set AND the
+Charging Station contains messages
+in that language
+The Charging Station SHALL show messages to the
+user in language2.
+C01.FR.10 If the field: language1 is not set The field: language2 SHALL NOT be set.
+C01.FR.11 Field: language1 SHALL be different from field
+language2.
+C01.FR.12 It is RECOMMENDED to implement messages in
+English as fall-back.
+C01.FR.13 If both language1 AND language2
+don’t match installed languages in the
+Charging Station
+It is RECOMMENDED to show messages to the EV
+Driver in English.
+C01.FR.17 Language SHALL be specified as RFC-4646 tags,
+see: [RFC5646], example: US English is: "en-US".
+C01.FR.18 If the IdToken is valid AND
+the EV driver is NOT allowed to charge
+at the type of EVSE(s) this Charging
+Station provides.
+The CSMS SHALL send an AuthorizeResponse with
+idTokenInfo.status NotAllowedTypeEVSE.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 75/471 Part 2 - Specification
+ID Precondition Requirement definition Note
+C01.FR.19 idToken is allowed for any EVSE of the
+Charging Station
+The CSMS SHALL send an AuthorizeResponse in
+which idTokenInfo has an empty (or absent) evseId
+list.
+This will be the most
+common case. Even
+though the idToken might
+be allowed on any EVSE,
+the idTokenInfo.status
+still needs to be
+Accepted before
+charging is allowed.
+C01.FR.20 idToken is allowed for a subset of
+EVSEs of the Charging Station
+The CSMS SHALL send an AuthorizeResponse in
+which IdTokenInfo has an evseId list with the
+allowed EVSEs.
+Note the difference
+between validity of an
+idToken and the fact
+whether this (type of)
+token is allowed on an
+EVSE. The
+idTokenInfo.status still
+needs to be Accepted
+before charging is
+allowed.
+C01.FR.21 C01.FR.20 The Charging Station SHALL only allow charging on
+the EVSEs mentioned in the AuthorizeResponse.
+C01.FR.22 idToken is not allowed for any EVSE of
+the Charging Station
+The CSMS SHALL send an AuthorizeResponse in
+which idTokenInfo.status is NotAtThisLocation
+and evseId list is empty (or absent).
+Status
+NotAtThisLocation
+needed in order to
+differentiate with the
+situation in which
+idToken is allowed on all
+EVSEs.
+C01.FR.23 When a transaction is still active, that
+had been authorized earlier by an
+idToken, but which is now no longer
+authorized for charging AND
+a new idToken is presented to the
+Charging Station for authorization,
+that differs from the inital idToken
+The Charging Station SHOULD not allow the
+authorization of a different idToken.
+Multiple idTokens for a
+transaction are most
+likely not supported by a
+CSMS.
+C01.FR.24 When a transaction is still active, that
+had been authorized earlier by an
+idToken, but which is now no longer
+authorized for charging AND
+Charging Stations sends an
+AuthorizeRequest for a new idToken,
+that differs from the inital idToken of
+the transaction
+The CSMS is RECOMMENDED to respond with an
+AuthorizeResponse with idTokenInfo.status =
+NotAtThisTime for this idToken.
+If a second authorization
+is done by Charging
+Station then CSMS can
+reject the idToken.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 76/471 Part 2 - Specification
+C01 - EV Driver Authorization using RFID
+C01 - EV Driver Authorization using RFID
+C01 - EV Driver Authorization using RFID
+C01 - EV Driver Authorization using RFID
+C01 - EV Driver Authorization using RFID
+C01 - EV Driver Authorization using RFID
+C01 - EV Driver Authorization using RFID
+C01 - EV Driver Authorization using RFID
+C01 - EV Driver Authorization
+5 Prerequisites Ongoing Transaction(s)
+Configuration Variable: MasterPassGroupId set.
+Users IdToken has groupId equal to the configured MasterPassGroupId.
+6 Postcondition(s) (Selected) transaction(s) stopped.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 107/471 Part 2 - Specification
+UserCharging StationCSMS
+one or more transactions are ongoing
+Present IdToken
+AuthorizeRequest(...)
+AuthorizeResponse(GroupId = MasterPassGroupId)
+alt[if idToken valid]
+alt[if Master Pass UI available]
+show Master Pass UI
+select transaction(s)
+loop[for all (selected) transactions]
+stop energy offer
+alt[if cable not permanently attached]
+unlock connector
+TransactionEventRequest(eventType = Ended,
+chargingState = EVConnected, stopReason = MasterPass,...)
+TransactionEventResponse(...)
+Figure 37. Sequence Diagram: Stop Transaction with a Master Pass
+7 Error Handling When the user does not make a selection before an acceptable timeout, the Charging Station
+SHALL go back to normal operation.
+8 Remarks The scenario description and sequence diagram above are based on the Configuration Variable
+for stop transaction being configured as follows.
+TxStopPoint: Authorized, DataSigned, PowerPathClosed, EnergyTransfer
+This use-case is also valid for other configurations, but then the transaction might stop at another
+moment, which might change the sequence in which message are send. For more details see the
+use case: E06 - Stop Transaction options

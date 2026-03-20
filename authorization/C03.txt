@@ -1,0 +1,54 @@
+C03 - Authorization using credit/debit card
+C03 - Authorization using credit/debit card
+C03 - Authorization using credit/debit card
+Table 63. C03 - Authorization using credit/debit card
+No. Type Description
+1 Name Authorization using credit card
+2 ID C03
+Functional block C. Authorization
+3 Objectives Make it possible to start a transaction using a credit card.
+4 Description A Charging Station with a credit/debit card terminal built inside the housing, or belonging to a
+group of Charging Stations that has a central payment terminal/kiosk. An EV Driver uses his card
+to pay for charging. The transaction is authorized by the payment company, the CSMS receives a
+message from the Payment System, and send a RequestStartTransactionRequest to the Charging
+Station to start the transaction.
+Actors EV Driver, Payment System, CSMS, Charging Station
+Scenario description 1. The EV Driver plugs in the Charging Cable
+2. The Charging Station sends an StatusNotificationRequest and TransactionEventRequest
+(eventType = Started) to notify the CSMS about the cable being plugged in.
+3. The Driver uses the credit/debit card terminal to authorize/pay for charging.
+4. The terminal communicates with its own server/back-office.
+5. The Payment System sends a message to the CSMS authorizing the user.
+6. The CSMS generates a unique id to be used as IdToken for this transaction.
+7. The CSMS sends a RequestStartTransactionRequest with the generated IdToken to the
+Charging Station.
+8. The Charging Station accepts the RequestStartTransactionRequest by sending a
+RequestStartTransactionResponse with Accepted.
+9. The Charging Station start Charging of the EV.
+10. The Charging Station send an TransactionEventRequest (eventType = Updated) to notify the
+CSMS about the charging having started.
+Alternative scenario(s) C03 - Authorization using credit/debit card - Requirements
+Table 64. C03 - Authorization using credit/debit card - Requirements
+ID. Precondition Requirement definition
+C03.FR.01 If the Charging Station receives a
+RequestStartTransactionRequest with an
+IdTokenType of type Central
+The Charging Station SHALL NOT send an AuthorizeRequest for
+the received IdTokenType.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 80/471 Part 2 - Specification
+ID. Precondition Requirement definition
+C03.FR.02 If the Charging Station has implemented an
+Authorization Cache AND the Charging Station
+receives IdTokenInfo for an IdTokenType of type
+Central in any message
+The Charging Station SHALL NOT store the information in its
+Authorization Cache.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 81/471 Part 2 - Specification
+C03 - Authorization using credit/debit card
+C03 - Authorization using credit/debit card
+C03 - Authorization using credit/debit card
+C03 - Authorization using credit/debit card
+C03 - Authorization using credit/debit card
+C03 - Authorization using credit/debit card

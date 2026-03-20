@@ -1,0 +1,133 @@
+G01 - Status Notification
+Test Cases
+================================================================================
+
+TC-G01-001
+Title: Connector status is always one of the valid ConnectorStatus enumeration values
+Requirement: G01.FR.01
+Steps:
+  1. Observe or retrieve the current reported status of any Charging Station connector (via StatusNotificationRequest or NotifyEventRequest).
+  2. Record the value of the connectorStatus field (or actualValue for AvailabilityState in a NotifyEventRequest).
+  3. Repeat for all connectors across multiple status transitions (Available, Occupied, Reserved, Unavailable, Faulted).
+Expected Result:
+  Every observed connectorStatus value (or AvailabilityState actualValue) is one of the enumeration members defined in ConnectorStatus: Available, Occupied, Reserved, Unavailable, or Faulted.
+  No message is ever sent with a connectorStatus value outside this enumeration.
+  The Charging Station does not omit the connectorStatus field from a StatusNotificationRequest.
+
+--------------------------------------------------------------------------------
+
+TC-G01-002
+Title: Unavailable status set by ChangeAvailabilityRequest persists across a reboot
+Requirement: G01.FR.02
+Steps:
+  1. Send a ChangeAvailabilityRequest targeting a specific EVSE with operationalStatus = Inoperative (Unavailable).
+  2. Confirm the Charging Station sends a StatusNotificationRequest with connectorStatus = Unavailable (or equivalent NotifyEventRequest with actualValue = "Unavailable") for the affected connector(s).
+  3. Power-cycle or reboot the Charging Station.
+  4. After the Charging Station reconnects and completes its boot sequence, observe the StatusNotificationRequest(s) it sends for the previously set EVSE.
+Expected Result:
+  After the reboot, the Charging Station sends a StatusNotificationRequest with connectorStatus = Unavailable (or a NotifyEventRequest with component.name = "Connector", variable = "AvailabilityState", actualValue = "Unavailable", trigger = "Delta") for the EVSE that was set Unavailable before the reboot.
+  The EVSE does not revert to Available or any other status following the reboot.
+  The CSMS receives the Unavailable status notification and responds with a StatusNotificationResponse (or NotifyEventResponse).
+
+--------------------------------------------------------------------------------
+
+TC-G01-003
+Title: Charging Station sends Occupied status when an EV connects to an Available connector
+Requirement: G01.FR.03
+Steps:
+  1. Verify the target connector is in the Available state.
+  2. Plug an EV into the connector.
+  3. Observe the message sent from the Charging Station to the CSMS.
+Expected Result:
+  The Charging Station sends either:
+    (a) A StatusNotificationRequest with connectorStatus = Occupied, or
+    (b) A NotifyEventRequest with component.name = "Connector", variable = "AvailabilityState", actualValue = "Occupied", and trigger = "Delta", including evse.id set to the EVSE number and evse.connectorId set to the connector number.
+  The CSMS responds with StatusNotificationResponse() (or NotifyEventResponse()) with no error indication.
+  The CSMS records the connector state as Occupied.
+
+--------------------------------------------------------------------------------
+
+TC-G01-004
+Title: Charging Station sends Available status when an EV disconnects from an Occupied connector not scheduled to become Unavailable
+Requirement: G01.FR.04
+Steps:
+  1. Verify the target connector is in the Occupied state (EV plugged in).
+  2. Confirm the connector is NOT scheduled to become Unavailable (i.e., G03.FR.05 condition does not apply).
+  3. Unplug the EV from the connector.
+  4. Observe the message sent from the Charging Station to the CSMS.
+Expected Result:
+  The Charging Station sends either:
+    (a) A StatusNotificationRequest with connectorStatus = Available, or
+    (b) A NotifyEventRequest with component.name = "Connector", variable = "AvailabilityState", actualValue = "Available", and trigger = "Delta", including evse.id set to the EVSE number and evse.connectorId set to the connector number.
+  The CSMS responds with StatusNotificationResponse() (or NotifyEventResponse()) with no error indication.
+  The CSMS records the connector state as Available.
+
+--------------------------------------------------------------------------------
+
+TC-G01-005
+Title: Charging Station sends Unavailable status when an EV disconnects from a connector scheduled to become Unavailable
+Requirement: G01.FR.05
+Steps:
+  1. Schedule the target connector to become Unavailable after the current session ends (trigger G03.FR.05 condition, e.g., via a ChangeAvailabilityRequest while the connector is Occupied).
+  2. Verify the connector is in the Occupied state (EV plugged in).
+  3. Unplug the EV from the connector.
+  4. Observe the message sent from the Charging Station to the CSMS.
+Expected Result:
+  The Charging Station sends either:
+    (a) A StatusNotificationRequest with connectorStatus = Unavailable, or
+    (b) A NotifyEventRequest with component.name = "Connector", variable = "AvailabilityState", actualValue = "Unavailable", and trigger = "Delta", including evse.id set to the EVSE number and evse.connectorId set to the connector number.
+  The CSMS responds with StatusNotificationResponse() (or NotifyEventResponse()) with no error indication.
+  The CSMS records the connector state as Unavailable.
+  The connector does NOT transition to Available.
+
+--------------------------------------------------------------------------------
+
+TC-G01-006
+Title: Charging Station sends Occupied status when a Reserved connector is taken by an EV whose IdToken matches the reservation
+Requirement: G01.FR.06
+Steps:
+  1. Place a reservation on the target connector so its status is Reserved.
+  2. Present an IdToken at the Charging Station that matches the reservation.
+  3. Plug an EV into the connector.
+  4. Observe the message sent from the Charging Station to the CSMS.
+Expected Result:
+  The Charging Station sends either:
+    (a) A StatusNotificationRequest with connectorStatus = Occupied, or
+    (b) A NotifyEventRequest with component.name = "Connector", variable = "AvailabilityState", actualValue = "Occupied", and trigger = "Delta", including evse.id set to the EVSE number and evse.connectorId set to the connector number.
+  The CSMS responds with StatusNotificationResponse() (or NotifyEventResponse()) with no error indication.
+  The CSMS records the connector state as Occupied.
+
+--------------------------------------------------------------------------------
+
+TC-G01-007
+Title: Charging Station sends a status notification with the new status when a ChangeAvailabilityRequest causes a connector status change
+Requirement: G01.FR.07
+Steps:
+  1. Verify the target connector is in a known status (e.g., Available).
+  2. Send a ChangeAvailabilityRequest to the CSMS targeting that connector with a different operationalStatus (e.g., Inoperative to trigger Unavailable).
+  3. Observe the message sent from the Charging Station to the CSMS following the availability change.
+Expected Result:
+  The Charging Station sends either:
+    (a) A StatusNotificationRequest where connectorStatus matches the new status resulting from the ChangeAvailabilityRequest (e.g., Unavailable), or
+    (b) A NotifyEventRequest with component.name = "Connector", variable = "AvailabilityState", trigger = "Delta", and actualValue equal to the new status (e.g., "Unavailable"), including evse.id and evse.connectorId for the affected connector.
+  The CSMS responds with StatusNotificationResponse() (or NotifyEventResponse()) with no error indication.
+  The CSMS records the connector's new status correctly.
+  The connectorStatus (or actualValue) in the notification exactly corresponds to the status change mandated by the ChangeAvailabilityRequest.
+
+--------------------------------------------------------------------------------
+
+TC-G01-008
+Title: Charging Station does not send StatusNotificationRequest for other connectors on the same EVSE when one connector becomes reserved or has a cable plugged in
+Requirement: G01.FR.08
+Steps:
+  1. Configure a Charging Station that has an EVSE with multiple connectors (at least two connectors on the same EVSE), all in Available state.
+  2. Either (a) create a reservation on one connector of that EVSE, or (b) plug a cable into one connector of that EVSE.
+  3. Observe all messages sent from the Charging Station to the CSMS for all connectors on that EVSE.
+Expected Result:
+  The Charging Station sends a StatusNotificationRequest (or NotifyEventRequest) only for the connector that was directly affected (the one reserved or having the cable plugged in).
+  The Charging Station does NOT send a StatusNotificationRequest (or NotifyEventRequest) for the remaining connector(s) on the same EVSE, even though those connectors are no longer usable.
+  The CSMS is responsible for inferring the usability of the other connectors based on its knowledge that they share the same EVSE.
+
+================================================================================
+END OF TEST CASES
+================================================================================

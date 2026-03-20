@@ -1,0 +1,230 @@
+N07 - Alert Event on how
+to handle the different
+monitor types .
+N04.FR.09 The maximum size and number of items of
+monitoringData in one
+SetVariableMonitoringRequest message is
+determined by the
+ItemsPerMessageSetVariableMonitoring
+and
+BytesPerMessageSetVariableMonitoring
+Configuration Variables.
+N04.FR.10 When the Charging Station receives a
+SetVariableMonitoringRequest for a
+component/variable combination for
+which a monitor with the same type
+and severity already exists with a
+different id.
+The Charging Station SHALL set the attributeStatus
+field in the corresponding SetMonitoringResult to:
+Duplicate.
+There cannot be two
+monitors of the same
+type with the same
+severity on the same
+variable. E.g. when a
+component/variable has
+a monitor with an
+UpperThreshold at value
+"67" and severity "4-
+Error", then there cannot
+be another
+UpperThreshold at value
+"78" with same severity
+"4-Error" defined.
+N04.FR.11 When the Charging Station receives a
+SetVariableMonitoringRequest without
+an Id AND
+N04.FR.08
+The Charging Station will generate an Id and return
+it in the SetVariableMonitoringResponse.
+N04.FR.12 When the Charging Station receives a
+SetVariableMonitoringRequest with an
+Id AND
+A monitor exists matching the given Id
+AND
+The given Component/Variable
+combination corresponds with the
+existing VariableMonitor.
+The Charging Station SHALL replace the monitor.
+N04.FR.13 When the Charging Station receives a
+SetVariableMonitoringRequest with an
+Id AND
+No monitor exists matching the given
+Id.
+The Charging Station SHALL set the attributeStatus
+field in the corresponding SetMonitoringResult to:
+Rejected.
+N04.FR.14 When the Charging Station receives a
+SetVariableMonitoringRequest with
+type Delta and value contains a
+negative value.
+The Charging Station SHALL set the attributeStatus
+field in the corresponding SetMonitoringResult to:
+Rejected.
+More information can be
+provided in the optional
+statusInfo element.
+N04.FR.15 N04.FR.12 AND
+The replaced VariableMonitor
+belonged to the
+'PreconfiguredMonitors'.
+The new VariableMonitor shall be classified as a
+'CustomMonitor', until reset by a
+SetMonitoringBaseRequest.
+N04.FR.16 When the Charging Station receives a
+SetVariableMonitoringRequest with an
+Id AND
+a monitor exists matching the given Id
+AND
+the given Component/Variable
+combination does NOT correspond
+with the existing VariableMonitor.
+The Charging Station SHALL respond with Rejected
+AND NOT replace the VariableMonitor.
+It is not allowed to
+change Variable or
+Component of a monitor.
+Edition 2 FINAL, 2022-12-15 N. Diagnostics
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 323/471 Part 2 - Specification
+ID Precondition Requirement definition Note
+N04.FR.17 When the CSMS sends a
+SetVariableMonitoringRequest with
+type Delta for a Variable that is NOT of
+a numeric type
+It is RECOMMENDED to use a monitorValue of 1. monitorValue is irrelevant
+for non-numeric types
+(e.g. any type except
+decimal or integer), since
+the monitor is triggered
+by every change of the
+Variable.
+N04.FR.18 N04.FR.12 AND
+The id in the
+SetVariableMonitoringRequest refers
+to a HardWiredMonitor
+The Charging Station SHALL respond with Rejected
+AND NOT replace the VariableMonitor.
+It is not possible to
+change a hardwired
+monitor.
+N04.FR.19 The Charging Station has rebooted The CSMS IS RECOMMENDED to send a
+GetMonitoringReportRequest message to get a new
+list of monitors.
+Custom monitors are
+persistent after reboot or
+firmware update, but IDs
+may have changed.
+N07 - Alert Event
+Table 226. N07 - Alert Event
+No. Type Description
+1 Name Alert Event
+2 ID N07
+Functional block N. Diagnostics
+3 Objective(s) To give the Charging Station the ability to notify the CSMS about monitoring events.
+4 Description NotifyEventRequest reports every Component/Variable for which a VariableMonitoring setting
+was triggered. Only the VariableMonitoring settings that are responsible for triggering an event
+are included.
+Actors Charging Station, CSMS
+Scenario description 1. If a threshold or a delta value has exceeded, the Charging Station sends a NotifyEventRequest
+to the CSMS.
+2. The CSMS responds with a NotifyEventResponse.
+5 Prerequisite(s) The Charging Station has active monitoring settings.
+The monitoring setting(s) might have been configured explicitly via a SetVariableMonitoring
+message or it might be "hard-wired" in the Charging Station’s firmware.
+6 Postcondition(s) The Charging Station notified the CSMS about the monitoring events.
+Charging StationCSMS
+alt[If a threshold or a delta value of a monitoring setting has been reached]
+loop[For each report part]
+NotifyEventRequest(generatedAt, tbc, seqNo, eventData)
+NotifyEventResponse()
+Figure 138. Sequence Diagram: Alert Event
+7 Error handling n/a
+Edition 2 FINAL, 2022-12-15 N. Diagnostics
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 326/471 Part 2 - Specification
+8 Remark(s) Requirement N07.FR.04 states that events with a severity equal or less than
+OfflineMonitoringEventQueuingSeverity shall be queued while the charging station is offline, and
+delivered once online. This implies that events with a severity greater than
+OfflineMonitoringEventQueuingSeverity will not be sent to CSMS. The result is, that the logical
+chain of events may be broken when the charging station is back online.
+For example, a monitoring event for a variable exceeding a threshold occurred while offline and
+was not sent. Once back online, at some point in time the monitoring event is reported with the
+variable cleared set to true, but CSMS did not even know that the threshold had been exceeded.
+CSMS will have to be able to deal with that.
+This problem can be prevented, while still adhering to the specification, by not simply discarding
+these monitoring events, but by delaying the evaluation of those monitors that exceed
+OfflineMonitoringEventQueuingSeverity, until the charging station comes back online. The result
+is, that when the charging station is back online, CSMS will get the monitoring events that apply to
+the current situation, and it is fully up-to-date regarding the monitors. Only those monitoring
+events that were triggered & cleared during the offline period will remain invisible to CSMS.
+N07 - Alert Event - Requirements
+Table 227. N07 - Requirements
+ID Precondition Requirement definition Note
+N07.FR.02 When a monitored value returns to
+within the set UpperThreshold or
+LowerThreshold
+The Charging Station SHALL send a
+NotifyEventRequest with an eventData with the
+attribute cleared is true.
+N07.FR.03 When the CSMS receives an
+notifyEventRequest
+The CSMS SHALL respond with an empty
+NotifyEventResponse.
+N07.FR.04 When a monitor is triggered AND
+The severity number of the monitor is
+equal to or lower than the severity
+number set in the Configuration
+Variable
+OfflineMonitoringEventQueuin
+gSeverity 
+AND
+The Charging Station is offline
+The Charging Station SHALL queue this
+NotifyEventRequest and deliver it when it is back
+online.
+N07.FR.05 When a monitor is triggered AND
+another event caused this event
+The Charging Station MAY include the eventId of
+the other event in the cause field of the eventData
+element in the NotifyEventRequest message.
+N07.FR.06 When a monitor is triggered An eventData element in a NotifyEventRequest
+SHALL contain the Component, Variable and
+variableMonitoringId that caused the event.
+N07.FR.07 When a monitor is triggered The Charging Station SHALL set the seqNo of the
+first NotifyEventRequest sent for this event to 0.
+N07.FR.10 When a monitor is triggered AND
+A variableMonitoring setting has been
+set on a write-only variable.
+The actualField of the NotifyEventRequest SHALL
+be empty.
+N07.FR.11 When modifying a set UpperThreshold
+or LowerThreshold VariableMonitor.
+The Charging Station SHALL check if the new
+threshold clears the old threshold OR if the new
+threshold is exceeded by the monitored value.
+N07.FR.12 When removing a set UpperThreshold
+or LowerThreshold VariableMonitor
+AND
+the threshold was exceeded.
+The Charging Station SHALL NOT send a
+NotifyEventRequest with an eventData with the
+attribute cleared is true.
+N07.FR.13 A VariableMonitoring needs to be stored
+persistently across reboots.
+N07.FR.14 When a variableMonitoring setting of
+type UpperThreshold or
+LowerThreshold has been triggered
+AND after a reboot occurred the
+monitored value returned within the
+configured threshold.
+The Charging Station SHALL send a
+NotifyEventRequest with an eventData with the
+attribute cleared is true.
+Edition 2 FINAL, 2022-12-15 N. Diagnostics
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 327/471 Part 2 - Specification
+ID Precondition Requirement definition Note
+N07.FR.15 When a monitor is triggered AND
+The severity of the monitor is greater
+than the monitoring severity level set
+in a SetMonitoringLevelRequest by the
+CSMS (see use case 

@@ -1,0 +1,69 @@
+E08 - Transaction stopped while Charging Station is offline
+Table 110. E08 - Transaction stopped while Charging Station is offline
+No. Type Description
+1 Name Transaction stopped while Charging Station is offline
+2 ID E08
+Functional block E. Transactions
+Parent use case E08 - Transaction stopped while Charging Station is offline - Requirements
+Table 111. E08 - Requirements
+ID Precondition Requirement definition Note
+E08.FR.01 If the IdToken presented is the same
+as the IdToken used to start the
+transaction.
+The Charging Station SHALL stop the energy
+offering.
+E08.FR.02 If the IdToken presented has the same
+GroupId as the IdToken used to start
+the transaction.
+The Charging Station SHALL stop the energy
+offering.
+E08.FR.03 (E08.FR.01 OR E08.FR.02)
+AND
+Cable not permanently attached
+The Charging Station SHALL unlock the connector.
+E08.FR.04 (E08.FR.01 OR E08.FR.02) The Charging Station SHALL "generate" a
+TransactionEventRequest (eventType = Ended).
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 152/471 Part 2 - Specification
+ID Precondition Requirement definition Note
+E08.FR.05 When Offline. The Charging Station MUST queue any
+TransactionEventRequest messages.
+E08.FR.06 After the connection is restored. The Charging Station MUST send queued
+TransactionEventRequest messages.
+E08.FR.07 The flag: offline SHALL be set to TRUE for any
+TransactionEventRequest that occurred while the
+Charging Station was offline.
+E08.FR.08 When a TransactionEventRequest has
+to be created
+The Charging Station SHALL set the message’s
+seqNo field as specified in Sequence Number
+Generation.
+This enables the CSMS
+to track the
+completeness of
+transaction information.
+E08.FR.09 When configured to send meter data
+in the TransactionEventRequest
+(eventType = Ended), See: Meter
+Values - Configuration
+The Charging Station SHALL add the configured
+measurands to the optional meterValue field in the
+TransactionEventRequest(eventType = Ended) sent
+to the CSMS to provide more details about
+transaction usage.
+E08.FR.10 E08.FR.09
+AND
+The Charging Station is running low on
+memory
+The Charging Station MAY drop meter data in the
+TransactionEventRequest(eventType = Ended)
+message.
+E08.FR.11 E08.FR.10 When dropping meter data, the Charging Station
+SHALL drop intermediate values first (1st value, 3th
+value, 5th etc), not start dropping values from the
+start of the list or stop adding values to the list.
+E08.FR.12 SampledDataSignReadings is true The Charging Station SHALL retrieve signed meter
+values and put them in the signedMeterValue field
+of sampledValues.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 153/471 Part 2 - Specification

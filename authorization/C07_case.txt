@@ -1,0 +1,477 @@
+C07 - Authorization using Contract Certificates
+Test Cases
+================================================================================
+
+OVERVIEW
+--------
+The C07 use case describes how an Electric Vehicle (EV) is authorized to charge
+at a Charging Station using a Contract Certificate (issued as part of the ISO
+15118 Plug & Charge mechanism). The Charging Station sends an AuthorizeRequest
+to the Charge Station Management System (CSMS), which validates the contract
+certificate and its chain using OCSP (Online Certificate Status Protocol) data.
+The CSMS replies with an authorization status, and charging only begins after
+successful authorization.
+
+Actors involved: EV, Charging Station, CSMS, OCSP server.
+
+Key configuration flags referenced:
+  - CentralContractValidationAllowed: allows the CSMS to validate the
+    certificate chain when the Charging Station lacks the root certificate.
+  - ContractValidationOffline: controls whether offline validation is attempted.
+  - LocalAuthorizeOffline: controls whether the Local Authorization List or
+    Cache is consulted during offline validation.
+
+================================================================================
+
+TEST CASE 1
+-----------
+Title: Successful authorization with valid contract certificate (online)
+
+Scenario:
+  The Charging Station is online, the EV presents a valid contract certificate,
+  and the CSMS successfully validates it via OCSP.
+
+Steps:
+  1. Connect an EV to the Charging Station.
+  2. The EV provides its contract certificate and certificate chain to the
+     Charging Station via ISO 15118 communication.
+  3. The Charging Station sends an AuthorizeRequest to the CSMS containing:
+       - The eMAID (e-Mobility Account Identifier) extracted from the contract
+         certificate.
+       - The ISO 15118 certificate hash data (iso15118CertificateHashData)
+         needed for the OCSP request, covering the contract certificate and its
+         chain.
+  4. The CSMS performs OCSP validation (real-time or cached) using the provided
+     hash data and determines the certificate is valid and not revoked.
+  5. The CSMS sends an AuthorizeResponse with an authorization status of
+     "Accepted".
+  6. The Charging Station starts the charging session.
+
+Expected Result:
+  - The AuthorizeRequest contains both the eMAID and the OCSP hash data.
+  - The CSMS responds with AuthorizeResponse indicating "Accepted".
+  - The Charging Station starts charging for the EV.
+
+================================================================================
+
+TEST CASE 2
+-----------
+Title: Authorization rejected due to revoked contract certificate
+
+Scenario:
+  The Charging Station is online, but the OCSP check reveals the contract
+  certificate has been revoked.
+
+Steps:
+  1. Connect an EV to the Charging Station.
+  2. The EV provides a contract certificate that is revoked in the OCSP
+     infrastructure.
+  3. The Charging Station sends an AuthorizeRequest to the CSMS with the eMAID
+     and the iso15118CertificateHashData.
+  4. The CSMS performs the OCSP check and discovers the certificate has been
+     revoked.
+  5. The CSMS sends an AuthorizeResponse with an authorization status indicating
+     rejection (e.g., "Invalid" or a revocation-related reason).
+  6. The Charging Station does not start the charging session.
+
+Expected Result:
+  - The AuthorizeResponse contains a non-acceptance status reflecting revocation.
+  - The Charging Station denies charging to the EV.
+
+================================================================================
+
+TEST CASE 3
+-----------
+Title: Authorization rejected due to expired contract certificate
+
+Scenario:
+  The Charging Station is online, but the contract certificate presented by the
+  EV has passed its expiry date.
+
+Steps:
+  1. Connect an EV to the Charging Station.
+  2. The EV provides an expired contract certificate.
+  3. The Charging Station sends an AuthorizeRequest to the CSMS with the eMAID
+     and the iso15118CertificateHashData.
+  4. The CSMS validates the certificate and determines it is expired.
+  5. The CSMS sends an AuthorizeResponse with a rejection status (e.g.,
+     "Invalid" or an expiry-related reason).
+  6. The Charging Station does not start the charging session.
+
+Expected Result:
+  - The AuthorizeResponse indicates rejection due to invalid/expired certificate.
+  - The Charging Station refuses to charge the EV.
+
+================================================================================
+
+TEST CASE 4
+-----------
+Title: AuthorizeRequest must include eMAID and OCSP hash data
+
+Scenario:
+  Verify that the AuthorizeRequest message sent by the Charging Station is
+  properly formed, containing both the eMAID and the certificate hash data
+  required for the OCSP request (requirement C07.FR.02).
+
+Steps:
+  1. Connect an EV to the Charging Station (Charging Station is online).
+  2. The EV provides its contract certificate and certificate chain.
+  3. Capture the AuthorizeRequest message sent by the Charging Station to the
+     CSMS.
+  4. Inspect the captured message for the presence of:
+       - The eMAID field populated with the EV's e-Mobility Account Identifier.
+       - The iso15118CertificateHashData field containing hash data for the
+         contract certificate and the full certificate chain.
+
+Expected Result:
+  - The AuthorizeRequest contains a non-empty eMAID.
+  - The AuthorizeRequest contains iso15118CertificateHashData covering both the
+    contract certificate and the certificate chain.
+  - No required field is absent or empty.
+
+================================================================================
+
+TEST CASE 5
+-----------
+Title: CSMS always responds to an AuthorizeRequest
+
+Scenario:
+  Verify that the CSMS never silently ignores an AuthorizeRequest — it always
+  sends back an AuthorizeResponse with an explicit status (requirement C07.FR.04).
+
+Steps:
+  1. Connect an EV to the Charging Station (Charging Station is online).
+  2. The EV provides its contract certificate.
+  3. The Charging Station sends an AuthorizeRequest to the CSMS.
+  4. Observe the CSMS behavior and capture its response.
+
+Expected Result:
+  - The CSMS sends an AuthorizeResponse for every received AuthorizeRequest.
+  - The AuthorizeResponse always contains an authorization status value
+    (accepted or a specific reason for rejection).
+  - The CSMS never times out without sending a response.
+
+================================================================================
+
+TEST CASE 6
+-----------
+Title: Charging Station passes full certificate chain when it lacks root
+       certificate and CentralContractValidationAllowed is true
+
+Scenario:
+  The Charging Station does not have the root certificate needed to validate the
+  contract certificate locally. The configuration flag
+  CentralContractValidationAllowed is set to true, so the Charging Station
+  delegates full validation to the CSMS by sending the certificate chain
+  (requirement C07.FR.06).
+
+Steps:
+  1. Configure the Charging Station without the relevant root certificate.
+  2. Set CentralContractValidationAllowed to true on the Charging Station.
+  3. Connect an EV and have it present a contract certificate.
+  4. The Charging Station attempts to validate the contract certificate locally
+     but cannot because the root certificate is missing.
+  5. Capture the AuthorizeRequest sent to the CSMS.
+  6. Inspect the AuthorizeRequest for the presence of the full certificate chain
+     in PEM format within the certificate attribute.
+  7. The CSMS validates the chain and responds with an AuthorizeResponse.
+
+Expected Result:
+  - The AuthorizeRequest includes the complete contract certificate chain in PEM
+    format in the certificate attribute.
+  - The CSMS is able to perform validation using the provided chain.
+  - The CSMS responds with the appropriate authorization status.
+
+================================================================================
+
+TEST CASE 7
+-----------
+Title: Charging Station does NOT pass certificate chain when
+       CentralContractValidationAllowed is false and root certificate is missing
+
+Scenario:
+  The Charging Station lacks the root certificate but CentralContractValidationAllowed
+  is false. The Charging Station should not attempt to pass the certificate chain
+  to the CSMS for central validation.
+
+Steps:
+  1. Configure the Charging Station without the relevant root certificate.
+  2. Set CentralContractValidationAllowed to false on the Charging Station.
+  3. Connect an EV and have it present a contract certificate.
+  4. Observe the Charging Station behavior.
+
+Expected Result:
+  - The Charging Station does not include the certificate chain (PEM) in the
+    AuthorizeRequest (or may deny the session locally).
+  - Central certificate validation is not performed.
+  - Charging is not started (since local validation cannot succeed without the
+    root certificate).
+
+================================================================================
+
+TEST CASE 8
+-----------
+Title: Charging Station offline, ContractValidationOffline is false — charging
+       not allowed
+
+Scenario:
+  The Charging Station has lost its connection to the CSMS. The configuration
+  flag ContractValidationOffline is set to false, meaning offline contract
+  validation is not permitted (requirement C07.FR.07).
+
+Steps:
+  1. Disconnect the Charging Station from the CSMS (simulate offline state).
+  2. Set ContractValidationOffline to false on the Charging Station.
+  3. Connect an EV and have it present a valid contract certificate.
+  4. Observe the Charging Station behavior.
+
+Expected Result:
+  - The Charging Station does not attempt local validation.
+  - The Charging Station does not start a charging session.
+  - The EV is denied charging until the Charging Station comes back online.
+
+================================================================================
+
+TEST CASE 9
+-----------
+Title: Charging Station offline, ContractValidationOffline is true — local
+       validation attempted
+
+Scenario:
+  The Charging Station is offline and ContractValidationOffline is true. The
+  Charging Station should try to validate the contract certificate locally
+  (requirement C07.FR.08).
+
+Steps:
+  1. Disconnect the Charging Station from the CSMS (simulate offline state).
+  2. Set ContractValidationOffline to true on the Charging Station.
+  3. Connect an EV and have it present a contract certificate.
+  4. Observe the Charging Station behavior.
+
+Expected Result:
+  - The Charging Station does not send an AuthorizeRequest to the CSMS (since
+    it is offline).
+  - The Charging Station attempts to validate the contract certificate using its
+    locally available certificates and OCSP cache.
+
+================================================================================
+
+TEST CASE 10
+------------
+Title: Offline validation success — eMAID found in Local Authorization List,
+       LocalAuthorizeOffline true
+
+Scenario:
+  The Charging Station is offline, ContractValidationOffline is true, the
+  contract certificate is locally valid, LocalAuthorizeOffline is true, and the
+  eMAID is present in the Local Authorization List (requirements C07.FR.09,
+  C07.FR.10).
+
+Steps:
+  1. Disconnect the Charging Station from the CSMS.
+  2. Set ContractValidationOffline to true.
+  3. Set LocalAuthorizeOffline to true.
+  4. Pre-populate the Local Authorization List with the EV's eMAID, marked as
+     accepted.
+  5. Ensure the Charging Station has the necessary certificates to validate the
+     contract certificate locally.
+  6. Connect an EV and have it present the contract certificate.
+  7. The Charging Station validates the contract certificate locally (valid).
+  8. The Charging Station looks up the eMAID in the Local Authorization List and
+     finds it with an "Accepted" status.
+  9. Observe the Charging Station behavior.
+
+Expected Result:
+  - The Charging Station successfully validates the certificate locally.
+  - The eMAID is found in the Local Authorization List with an accepted status.
+  - The Charging Station starts the charging session without contacting the CSMS.
+
+================================================================================
+
+TEST CASE 11
+------------
+Title: Offline validation — eMAID found in Authorization Cache (not Local
+       Authorization List)
+
+Scenario:
+  The Charging Station is offline, ContractValidationOffline is true, the
+  contract certificate is locally valid, LocalAuthorizeOffline is true, and the
+  eMAID is not in the Local Authorization List but is found in the Authorization
+  Cache (requirement C07.FR.09 covers both sources).
+
+Steps:
+  1. Disconnect the Charging Station from the CSMS.
+  2. Set ContractValidationOffline to true.
+  3. Set LocalAuthorizeOffline to true.
+  4. Ensure the Local Authorization List does NOT contain the EV's eMAID.
+  5. Ensure the Authorization Cache contains the EV's eMAID with an accepted
+     status from a previous online session.
+  6. Ensure the Charging Station has the necessary certificates for local
+     validation.
+  7. Connect an EV and have it present the contract certificate.
+  8. The Charging Station validates the certificate locally (valid).
+  9. The Charging Station looks up the eMAID — not in Local Authorization List,
+     but found in Authorization Cache.
+
+Expected Result:
+  - The Charging Station finds the eMAID in the Authorization Cache.
+  - The Charging Station starts the charging session based on the cached
+    authorization.
+
+================================================================================
+
+TEST CASE 12
+------------
+Title: Offline validation — eMAID not found in Local Authorization List or Cache
+
+Scenario:
+  The Charging Station is offline, ContractValidationOffline is true, the
+  contract certificate is locally valid, LocalAuthorizeOffline is true, but the
+  eMAID is not found in either the Local Authorization List or the Authorization
+  Cache.
+
+Steps:
+  1. Disconnect the Charging Station from the CSMS.
+  2. Set ContractValidationOffline to true.
+  3. Set LocalAuthorizeOffline to true.
+  4. Ensure neither the Local Authorization List nor the Authorization Cache
+     contains the EV's eMAID.
+  5. Connect an EV and have it present the contract certificate.
+  6. The Charging Station validates the certificate locally (valid).
+  7. The Charging Station looks up the eMAID in the Local Authorization List and
+     Authorization Cache — not found in either.
+
+Expected Result:
+  - The Charging Station cannot authorize the EV without a matching entry.
+  - Charging is denied until the Charging Station can reach the CSMS or the
+     eMAID is added to the local data.
+
+================================================================================
+
+TEST CASE 13
+------------
+Title: Offline validation — contract certificate is locally invalid
+
+Scenario:
+  The Charging Station is offline, ContractValidationOffline is true, but the
+  local validation of the contract certificate fails (e.g., the certificate is
+  expired or has an invalid signature as determined locally).
+
+Steps:
+  1. Disconnect the Charging Station from the CSMS.
+  2. Set ContractValidationOffline to true.
+  3. Connect an EV and have it present an invalid or expired contract
+     certificate.
+  4. The Charging Station attempts local certificate validation and determines it
+     is invalid.
+
+Expected Result:
+  - Local certificate validation fails.
+  - The Charging Station does not proceed to look up the eMAID.
+  - Charging is denied.
+
+================================================================================
+
+TEST CASE 14
+------------
+Title: Offline validation — LocalAuthorizeOffline is false
+
+Scenario:
+  The Charging Station is offline, ContractValidationOffline is true, and the
+  contract certificate is locally valid, but LocalAuthorizeOffline is false,
+  meaning the Charging Station should not fall back to the Local Authorization
+  List or Cache.
+
+Steps:
+  1. Disconnect the Charging Station from the CSMS.
+  2. Set ContractValidationOffline to true.
+  3. Set LocalAuthorizeOffline to false.
+  4. Connect an EV and have it present a valid contract certificate.
+  5. The Charging Station validates the certificate locally (valid).
+  6. Observe whether the Charging Station consults the Local Authorization List
+     or Authorization Cache.
+
+Expected Result:
+  - The Charging Station does not look up the eMAID in the Local Authorization
+    List or Authorization Cache.
+  - Charging is denied since central authorization cannot be reached and local
+    fallback is disabled.
+
+================================================================================
+
+TEST CASE 15
+------------
+Title: Charging Station comes back online after an offline period — resumes
+       normal AuthorizeRequest flow
+
+Scenario:
+  The Charging Station was offline and is now back online. When the next EV
+  connects, authorization should follow the standard online flow (send
+  AuthorizeRequest to CSMS).
+
+Steps:
+  1. Start with the Charging Station in an offline state.
+  2. Restore the connection between the Charging Station and the CSMS.
+  3. Connect an EV and have it present a valid contract certificate.
+  4. Observe the Charging Station behavior.
+
+Expected Result:
+  - The Charging Station detects it is back online.
+  - The Charging Station sends an AuthorizeRequest to the CSMS (not attempting
+    local offline validation).
+  - The CSMS validates via OCSP and responds with an AuthorizeResponse.
+  - Charging starts if the response is "Accepted".
+
+================================================================================
+
+TEST CASE 16
+------------
+Title: CSMS uses cached OCSP data when real-time OCSP is unavailable
+
+Scenario:
+  The CSMS cannot reach the OCSP server in real time but has a valid cached OCSP
+  response for the presented certificate. The CSMS should use the cached data
+  to validate (requirement C07.FR.05 permits real-time or cached OCSP data).
+
+Steps:
+  1. The Charging Station is online and the EV connects with a valid contract
+     certificate.
+  2. Simulate the OCSP server being unreachable from the CSMS.
+  3. Ensure the CSMS has a valid, non-expired cached OCSP response for the
+     contract certificate.
+  4. The Charging Station sends an AuthorizeRequest to the CSMS.
+  5. The CSMS attempts real-time OCSP but falls back to the cached OCSP
+     response.
+  6. The CSMS sends an AuthorizeResponse based on the cached data.
+
+Expected Result:
+  - The CSMS successfully uses cached OCSP data.
+  - An AuthorizeResponse is returned with an appropriate status.
+  - Charging proceeds normally if the cached OCSP response shows the certificate
+    is good.
+
+================================================================================
+
+TEST CASE 17
+------------
+Title: CSMS receives AuthorizeRequest without OCSP hash data (malformed request)
+
+Scenario:
+  A Charging Station sends an AuthorizeRequest missing the
+  iso15118CertificateHashData field, which is required by C07.FR.02. The CSMS
+  must still respond with an AuthorizeResponse (C07.FR.04) and provide a
+  meaningful rejection status.
+
+Steps:
+  1. Simulate or configure a Charging Station to send an AuthorizeRequest that
+     contains only the eMAID but omits the iso15118CertificateHashData.
+  2. The malformed request is received by the CSMS.
+  3. Observe the CSMS response.
+
+Expected Result:
+  - The CSMS responds with an AuthorizeResponse.
+  - The status indicates rejection (e.g., "Invalid" or an error reason).
+  - The CSMS does not crash or leave the request unanswered.
+  - Charging is not started.
+
+================================================================================

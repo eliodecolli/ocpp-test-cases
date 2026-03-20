@@ -1,0 +1,188 @@
+E09 - When cable disconnected on EV-side: Stop Transaction
+Test Cases
+================================================================================
+
+TC-E09-001
+Title: Transaction is deauthorized on EV-side cable disconnect when StopTxOnEVSideDisconnect = true
+Requirement: E09.FR.01
+Steps:
+  1. Ensure StopTxOnEVSideDisconnect is set to true on the Charging Station.
+  2. Ensure an active transaction is ongoing between the EV and the Charging Station.
+  3. EV Driver unplugs the cable at the car (EV) side.
+Expected Result:
+  The Charging Station immediately deauthorizes the transaction. Energy transfer stops and
+  does not resume. If the EV is reconnected, the Charging Station does not allow energy
+  transfer until a new authorization is completed. The transaction is treated as ended, not
+  merely suspended.
+
+--------------------------------------------------------------------------------
+
+TC-E09-002
+Title: Cable is unlocked automatically when UnlockOnEVSideDisconnect = true and cable is not permanently attached
+Requirement: E09.FR.02
+Steps:
+  1. Ensure StopTxOnEVSideDisconnect is set to true on the Charging Station.
+  2. Ensure UnlockOnEVSideDisconnect is set to true on the Charging Station.
+  3. Ensure the Charging Cable is not permanently attached to the Charging Station.
+  4. Ensure an active transaction is ongoing.
+  5. EV Driver unplugs the cable at the car (EV) side.
+Expected Result:
+  The Charging Station unlocks the Charging Cable connector automatically without requiring
+  any EV Driver interaction. No authorization prompt is presented before the unlock occurs.
+
+--------------------------------------------------------------------------------
+
+TC-E09-003
+Title: Cable is unlocked only after EV Driver authorization when UnlockOnEVSideDisconnect = false and cable is not permanently attached
+Requirement: E09.FR.03
+Steps:
+  1. Ensure StopTxOnEVSideDisconnect is set to true on the Charging Station.
+  2. Ensure UnlockOnEVSideDisconnect is set to false on the Charging Station.
+  3. Ensure the Charging Cable is not permanently attached to the Charging Station.
+  4. Ensure an active transaction is ongoing.
+  5. EV Driver unplugs the cable at the car (EV) side.
+  6. EV Driver performs a successful authorization action at the Charging Station (e.g., presents RFID card).
+Expected Result:
+  The Charging Station does NOT unlock the Charging Cable before the EV Driver completes
+  authorization. After successful authorization, the Charging Station unlocks the Charging
+  Cable. The EV Driver can then unplug the cable from the Charging Station side.
+
+--------------------------------------------------------------------------------
+
+TC-E09-004
+Title: TransactionEventRequest uses correct seqNo field upon cable disconnect
+Requirement: E09.FR.04
+Steps:
+  1. Ensure StopTxOnEVSideDisconnect is set to true on the Charging Station.
+  2. Ensure an active transaction is ongoing with a known current sequence number N.
+  3. EV Driver unplugs the cable at the car (EV) side.
+Expected Result:
+  The Charging Station sends a TransactionEventRequest to the CSMS. The seqNo field in
+  the message is set to N + 1, where N is the seqNo of the last TransactionEventRequest
+  sent for this transaction. The seqNo follows the Sequence Number Generation rules
+  defined in the specification, enabling the CSMS to detect gaps or missing messages.
+
+--------------------------------------------------------------------------------
+
+TC-E09-005
+Title: TransactionEventRequest (eventType = Ended) contains configured meter value measurands
+Requirement: E09.FR.05
+Steps:
+  1. Configure the Charging Station to send meter data in TransactionEventRequest with
+     eventType = Ended (refer to Meter Values - Configuration for the applicable settings).
+  2. Ensure StopTxOnEVSideDisconnect is set to true on the Charging Station.
+  3. Ensure an active transaction is ongoing.
+  4. EV Driver unplugs the cable at the car (EV) side.
+Expected Result:
+  The Charging Station sends a TransactionEventRequest to the CSMS with:
+    - eventType = Ended
+    - transactionId matching the ongoing transaction (e.g., AB1234)
+    - triggerReason = EVCommunicationLost
+    - stoppedReason = EVDisconnected
+    - meterValues field populated with the configured measurands as non-empty entries.
+  The CSMS receives the message and responds with TransactionEventResponse().
+
+--------------------------------------------------------------------------------
+
+TC-E09-006
+Title: Charging Station may drop meter data in TransactionEventRequest (Ended) when running low on memory
+Requirement: E09.FR.06
+Steps:
+  1. Configure the Charging Station to send meter data in TransactionEventRequest with
+     eventType = Ended.
+  2. Ensure StopTxOnEVSideDisconnect is set to true on the Charging Station.
+  3. Bring the Charging Station into a low-memory state (simulated or via test harness).
+  4. Ensure an active transaction is ongoing.
+  5. EV Driver unplugs the cable at the car (EV) side.
+Expected Result:
+  The Charging Station sends a TransactionEventRequest to the CSMS with eventType = Ended.
+  The meterValues field MAY contain fewer entries than normally configured, or may be
+  absent. The message is still sent and the CSMS responds with TransactionEventResponse().
+  Dropping meter data in this condition is accepted behavior and does not constitute a
+  protocol violation.
+
+--------------------------------------------------------------------------------
+
+TC-E09-007
+Title: When dropping meter data due to low memory, intermediate values are dropped first
+Requirement: E09.FR.07
+Steps:
+  1. Configure the Charging Station to send a sequence of meter value samples
+     (e.g., values V1, V2, V3, V4, V5 collected during the transaction).
+  2. Ensure StopTxOnEVSideDisconnect is set to true on the Charging Station.
+  3. Bring the Charging Station into a low-memory state such that only a subset of meter
+     values can be included.
+  4. Ensure an active transaction is ongoing.
+  5. EV Driver unplugs the cable at the car (EV) side.
+Expected Result:
+  The Charging Station sends a TransactionEventRequest with eventType = Ended. The
+  meterValues field contains the reduced set of values with intermediate entries dropped
+  first (i.e., values at odd positions within the list: 1st, 3rd, 5th, etc. are removed
+  before the boundary values). The Charging Station does NOT drop values strictly from
+  the beginning of the list, nor does it simply stop appending values at the end of the
+  list. The retained values reflect this interleaved-drop strategy.
+
+--------------------------------------------------------------------------------
+
+TC-E09-008
+Title: Signed meter values are placed in signedMeterValue field when SampledDataSignReadings = true
+Requirement: E09.FR.08
+Steps:
+  1. Set SampledDataSignReadings to true on the Charging Station.
+  2. Ensure StopTxOnEVSideDisconnect is set to true on the Charging Station.
+  3. Ensure an active transaction is ongoing.
+  4. EV Driver unplugs the cable at the car (EV) side.
+Expected Result:
+  The Charging Station retrieves signed meter readings from the meter. The
+  TransactionEventRequest sent to the CSMS with eventType = Ended contains sampledValues
+  entries where the signedMeterValue field is populated with the signed meter data. The
+  signedMeterValue field is not empty or absent for the relevant sampledValues entries.
+
+--------------------------------------------------------------------------------
+
+TC-E09-009
+Title: StatusNotificationRequest (Available) is sent after transaction ends and connector is free
+Requirement: E09.FR.01, E09.FR.02
+Steps:
+  1. Ensure StopTxOnEVSideDisconnect is set to true on the Charging Station.
+  2. Ensure UnlockOnEVSideDisconnect is set to true and cable is not permanently attached.
+  3. Ensure an active transaction is ongoing.
+  4. EV Driver unplugs the cable at the car (EV) side.
+  5. Charging Station automatically unlocks and the cable is removed.
+Expected Result:
+  After the cable is fully disconnected and the connector becomes free, the Charging Station
+  sends a StatusNotificationRequest to the CSMS with connectorStatus = Available.
+  The CSMS responds with StatusNotificationResponse(). The Charging Station is now in
+  Idle status as specified in the postcondition.
+
+--------------------------------------------------------------------------------
+
+TC-E09-010
+Title: Full message sequence for EV-side disconnect with StopTxOnEVSideDisconnect = true and auto-unlock
+Requirement: E09.FR.01, E09.FR.02, E09.FR.04, E09.FR.05
+Steps:
+  1. Set StopTxOnEVSideDisconnect = true, UnlockOnEVSideDisconnect = true on the
+     Charging Station.
+  2. Configure meter data reporting in TransactionEventRequest (eventType = Ended).
+  3. Ensure an active transaction is ongoing with transactionId = AB1234 and current
+     seqNo = N.
+  4. EV Driver unplugs the cable at the car (EV) side.
+Expected Result:
+  The following sequence of events and messages occurs in order:
+    a. The Charging Station suspends the energy offer to the EV.
+    b. The Charging Station sends TransactionEventRequest to the CSMS with:
+         - eventType = Ended
+         - transactionId = AB1234
+         - seqNo = N + 1
+         - triggerReason = EVCommunicationLost
+         - stoppedReason = EVDisconnected
+         - meterValues field populated per configuration
+    c. The CSMS responds with TransactionEventResponse().
+    d. The Charging Station unlocks the connector automatically.
+    e. The Charging Station sends StatusNotificationRequest with connectorStatus = Available.
+    f. The CSMS responds with StatusNotificationResponse().
+  The Charging Station is in Idle status after this sequence.
+
+================================================================================
+END OF TEST CASES
+================================================================================

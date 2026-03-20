@@ -1,0 +1,182 @@
+B05 - Set Variables - Test Cases
+
+GOAL: Allow the CSMS to change the value of one or more variables on a Charging Station's components. The Charging Station must validate each request and report the result per variable.
+
+================================================================================
+
+TEST CASE 1: Set a single variable successfully
+Scenario: CSMS sets a valid variable on a known component.
+Steps:
+  1. CSMS sends SetVariablesRequest with one SetVariableData element (valid component, variable, and value).
+  2. Charging Station processes the request.
+  3. Charging Station sends SetVariablesResponse.
+Expected result:
+  - Response contains one SetVariableResult.
+  - attributeStatus is "Accepted".
+  - The variable is updated to the new value on the Charging Station.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 2: Set multiple variables in one request
+Scenario: CSMS sets several variables at once (within the allowed item limit).
+Steps:
+  1. CSMS sends SetVariablesRequest with X SetVariableData elements (all valid).
+  2. Charging Station processes all entries.
+  3. Charging Station sends SetVariablesResponse.
+Expected result:
+  - Response contains exactly X SetVariableResult elements.
+  - Each result corresponds to the matching SetVariableData element (same component/variable).
+
+--------------------------------------------------------------------------------
+
+TEST CASE 3: Response mirrors component and variable from the request
+Scenario: Verify that each SetVariableResult references the same component/variable as sent.
+Steps:
+  1. CSMS sends SetVariablesRequest with multiple entries.
+  2. Charging Station responds.
+Expected result:
+  - Each SetVariableResult contains the same component and variable combination as the corresponding SetVariableData.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 4: Request includes attributeType — response echoes it
+Scenario: CSMS specifies an attributeType (e.g., "Target") in the request.
+Steps:
+  1. CSMS sends SetVariablesRequest with an attributeType in the SetVariableData.
+  2. Charging Station responds.
+Expected result:
+  - The corresponding SetVariableResult contains the same attributeType.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 5: Request without attributeType — defaults to "Actual"
+Scenario: CSMS omits the attributeType in the request.
+Steps:
+  1. CSMS sends SetVariablesRequest without attributeType.
+  2. Charging Station responds.
+Expected result:
+  - The SetVariableResult contains attributeType "Actual".
+
+--------------------------------------------------------------------------------
+
+TEST CASE 6: Unknown Component
+Scenario: The component referenced in the request does not exist on the Charging Station.
+Steps:
+  1. CSMS sends SetVariablesRequest referencing a non-existent component.
+  2. Charging Station responds.
+Expected result:
+  - SetVariableResult has attributeStatus "UnknownComponent".
+
+--------------------------------------------------------------------------------
+
+TEST CASE 7: Unknown Variable for a known Component
+Scenario: The component exists but the variable does not.
+Steps:
+  1. CSMS sends SetVariablesRequest with a valid component but unknown variable.
+  2. Charging Station responds.
+Expected result:
+  - SetVariableResult has attributeStatus "UnknownVariable".
+
+--------------------------------------------------------------------------------
+
+TEST CASE 8: Unsupported attributeType
+Scenario: The attributeType is not supported for the given variable.
+Steps:
+  1. CSMS sends SetVariablesRequest with an attributeType not supported for that variable.
+  2. Charging Station responds.
+Expected result:
+  - SetVariableResult has attributeStatus "NotSupportedAttributeType".
+
+--------------------------------------------------------------------------------
+
+TEST CASE 9: Value is incorrectly formatted
+Scenario: The value provided does not match the expected format for the variable.
+Steps:
+  1. CSMS sends SetVariablesRequest with a malformed value for a valid variable.
+  2. Charging Station responds.
+Expected result:
+  - SetVariableResult has attributeStatus "Rejected".
+  - Optional statusInfo may provide additional detail.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 10: Value is out of the valid range
+Scenario: The value is correctly formatted but falls outside the allowed min/max range.
+Steps:
+  1. CSMS sends SetVariablesRequest with a value that is too low or too high for the variable.
+  2. Charging Station responds.
+Expected result:
+  - SetVariableResult has attributeStatus "Rejected".
+  - Optional statusInfo may provide additional detail.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 11: ReadOnly variable — cannot be set
+Scenario: The CSMS attempts to set a variable that is read-only.
+Steps:
+  1. CSMS sends SetVariablesRequest for a ReadOnly variable.
+  2. Charging Station responds.
+Expected result:
+  - SetVariableResult has attributeStatus "Rejected".
+
+--------------------------------------------------------------------------------
+
+TEST CASE 12: Technical failure prevents setting the variable
+Scenario: The variable is valid and writable, but an internal error prevents the change.
+Steps:
+  1. CSMS sends SetVariablesRequest for a valid, writable variable.
+  2. Charging Station encounters a technical problem setting the value.
+Expected result:
+  - SetVariableResult has attributeStatus "Rejected".
+
+--------------------------------------------------------------------------------
+
+TEST CASE 13: Mixed request — some valid, some invalid
+Scenario: Request contains a mix of valid and invalid entries.
+Steps:
+  1. CSMS sends SetVariablesRequest with 3 elements:
+     - One valid variable with a correct value.
+     - One unknown variable.
+     - One variable with an out-of-range value.
+  2. Charging Station responds.
+Expected result:
+  - Response contains 3 SetVariableResult elements.
+  - Valid entry: "Accepted".
+  - Unknown variable: "UnknownVariable".
+  - Out-of-range value: "Rejected".
+
+--------------------------------------------------------------------------------
+
+TEST CASE 14: CSMS does not exceed ItemsPerMessageSetVariables limit
+Scenario: CSMS respects the maximum number of items per SetVariables message.
+Steps:
+  1. Confirm the station's reported ItemsPerMessageSetVariables value.
+  2. CSMS sends a request with exactly that number of items.
+  3. CSMS does not send a request with more items than allowed.
+Expected result:
+  - Request at the limit is accepted and processed normally.
+  - No request is sent exceeding the limit.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 15: No duplicate Component+Variable+AttributeType in a single request
+Scenario: CSMS must not send two entries with the same component, variable, and attributeType in one request.
+Steps:
+  1. Verify that the CSMS does not construct a SetVariablesRequest with duplicate component/variable/attributeType combinations.
+  2. Note: an omitted attributeType is treated as "Actual".
+Expected result:
+  - No duplicate entries are present in the request.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 16: Setting Actual, Target, MinSet, and MaxSet attributes
+Scenario: Demonstrate that different attributeTypes represent different aspects of a variable (e.g., fan speed).
+Steps:
+  1. CSMS sends SetVariablesRequest setting "Target" for a variable (e.g., desired fan speed).
+  2. CSMS separately sets "MinSet" and "MaxSet" (e.g., min and max boundaries).
+  3. Charging Station responds to each.
+Expected result:
+  - All are accepted (assuming valid values within constraints).
+  - Each attributeType is treated as a distinct writable attribute.
+
+--------------------------------------------------------------------------------

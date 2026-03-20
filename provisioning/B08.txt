@@ -1,0 +1,138 @@
+B08 - Get Custom Report
+Table 49. B08 - Get Custom Report
+No. Type Description
+1 Name Get Custom Report
+2 ID B08
+Functional block B. Provisioning
+3 Objective(s) To give the CSMS the ability to request a report of all Components and Variables limited to those
+that match ComponentCriteria and/or the list of ComponentVariables.
+4 Description This use case describes how the CSMS requests a Charging Station to send a report of all
+Components and Variables limited to those that match ComponentCriteria and/or the list of
+ComponentVariables. The result will be returned asynchronously in one or more
+NotifyReportRequest messages.
+Actors Charging Station, CSMS
+Scenario description 1. The CSO triggers the CSMS to request a report from a Charging Station.
+2. The CSMS requests the Charging Station for a report with a GetReportRequest.
+3. The Charging Station responds with a GetReportResponse.
+4. The Charging Station asynchronously sends the results in one or more NotifyReportRequest
+messages.
+5. The CSMS responds with a NotifyReportResponse.
+5 Prerequisite(s) n/a
+6 Postcondition(s) Successful postcondition:
+The Charging Station was able to send the requested report.
+Failure postcondition:
+The Charging Station was not able to send the requested report.
+CSO CSMS Charging Station
+request for a custom report
+GetReportRequest(requestId, componentCriteria, componentVariables)
+GetReportResponse(status)
+loop[for each report part]
+NotifyReportRequest(generatedAt, requestId, tbc, reportData,...)
+NotifyReportResponse()
+Figure 17. Sequence Diagram: Get Custom Report
+7 Error handling n/a
+8 Remark(s) n/a
+B08 - Get Custom Report - Requirements
+Table 50. B08 - Requirements
+ID Precondition Requirement definition
+B08.FR.01 NOT B08.FR.15 AND
+When the Charging Station receives a
+getReportRequest for supported criteria
+The Charging Station SHALL send a getReportResponse with
+Accepted
+B08.FR.02 When the Charging Station receives a
+getReportRequest for not supported criteria
+The Charging Station SHALL send a getReportResponse with
+NotSupported
+B08.FR.03 B08.FR.01 The Charging Station SHALL send the requested information via
+one or more NotifyReportRequest messages to the CSMS.
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 60/471 Part 2 - Specification
+ID Precondition Requirement definition
+B08.FR.04 B08.FR.01 AND
+The getReportRequest contained a requestId
+Every NotifyReportRequest sent for this getReportRequest
+SHALL contain the same requestId.
+B08.FR.05 B08.FR.01 AND
+componentCriteria and componentVariables are
+NOT both empty.
+Every NotifyReportRequest sent for this getReportRequest
+SHALL be limited to the set componentCriteria and
+componentVariables.
+B08.FR.06 The maximum number of componentVariables in one
+getReportRequest message is given by the
+ItemsPerMessageGetReport Configuration Variable
+B08.FR.07 B08.FR.01 AND
+ComponentCriteria contains: Active
+The Charging Station SHALL report every component that has
+the variable Active set to true, or does not have the Active
+variable in a NotifyReportRequest.
+B08.FR.08 B08.FR.01
+AND
+ComponentCriteria contains: Available
+The Charging Station SHALL report every component that has
+the variable Available set to true, or does not have the Available
+variable, in a NotifyReportRequest.
+B08.FR.09 B08.FR.01 AND
+ComponentCriteria contains: Enabled
+The Charging Station SHALL report every component that has
+the variable Enabled set to true, or does not have the Enabled
+variable, in a NotifyReportRequest.
+B08.FR.10 B08.FR.01 AND
+ComponentCriteria contains: Problem
+The Charging Station SHALL report every component that has
+the variable Problem set to true in a NotifyReportRequest.
+B08.FR.11 B08.FR.01 AND
+componentCriteria is absent AND
+componentVariables is NOT empty.
+Every NotifyReportRequest sent for this getReportRequest is
+limited to the set in componentVariables.
+B08.FR.12 B08.FR.01 The reported variables in NotifyReportRequest SHALL contain
+variableCharacteristics.
+B08.FR.13 B08.FR.01 AND
+More than one componentCriteria is given.
+The Charging Station SHALL report all components that have at
+least one of the given criteria (logical OR).
+B08.FR.14 The sequence number contained in the seqNo field of the
+NotifyReportRequest is incremental per report. So the
+NotifyReportRequest message which contains the first report
+part, SHALL have a seqNo with value 0.
+B08.FR.15 When the Charging Station receives a
+GetReportRequest with a combination of criteria
+which results in an empty result set.
+The Charging Station SHALL respond with a
+GetReportResponse(status=EmptyResultSet).
+B08.FR.16 When the Charging Station is temporarily unable
+to execute a report request
+The Charging Station SHALL send a getBaseReportResponse
+with Rejected.
+B08.FR.17 Charging Station receives a GetReportRequest
+with more ComponentVariableType elements
+than allowed by
+ItemsPerMessageGetReport
+The Charging Station MAY respond with a
+CALLERROR(OccurenceConstraintViolation)
+B08.FR.18 Charging Station receives a GetReportRequest
+with a length of more bytes than allowed by
+BytesPerMessageGetReport
+The Charging Station MAY respond with a
+CALLERROR(FormatViolation)
+B08.FR.19 When Charging Station receives a
+GetReportRequest with componentVariable
+elements in which component.instance and/or
+component.evse are missing
+The Charging Station SHALL report for every instance and/or
+EVSE of the component in componentVariable.
+B08.FR.20 When Charging Station receives a
+GetReportRequest with componentVariable
+elements in which variable is missing
+The Charging Station SHALL report for every variable of the
+component in componentVariable.
+B08.FR.21 When Charging Station receives a
+GetReportRequest with componentVariable
+elements in which variable is present, but
+instance is missing
+The Charging Station SHALL report for every instance of the
+variable of the component in componentVariable.
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 61/471 Part 2 - Specification

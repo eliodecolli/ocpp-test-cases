@@ -1,0 +1,510 @@
+C12 - Start Transaction - Cached Id
+Test Cases
+================================================================================
+
+PROTOCOL SUMMARY
+----------------
+C12 describes how a Charging Station authorizes an EV Driver to start a charging
+transaction using its local Authorization Cache, avoiding the need to send an
+AuthorizeRequest to the CSMS. This speeds up authorization when the driver's
+IdToken is already cached as valid. The Charging Station still sends a
+TransactionEventRequest to the CSMS, which then validates the token in the
+background. If the token has become invalid at the CSMS level, the Charging
+Station learns this from the TransactionEventResponse and may stop the energy
+offering or the transaction depending on configuration.
+
+================================================================================
+TEST CASE 1 - Happy Path: Cached Valid IdToken Authorizes Transaction
+================================================================================
+Title: Successful authorization using a valid cached IdToken
+
+Description:
+The EV Driver presents an IdToken that is stored in the Authorization Cache
+with status "Accepted". The Charging Station authorizes the driver locally,
+starts charging, and notifies the CSMS via a TransactionEventRequest.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- LocalPreAuthorize = true
+- The driver's IdToken is present in the Authorization Cache with status Accepted
+- The IdToken has not expired
+- The Charging Station is online
+- The cable is plugged in
+
+Steps:
+1. EV Driver plugs the charging cable into the Charging Station.
+2. The Charging Station sends a StatusNotificationRequest (Occupied) to the CSMS.
+3. The CSMS responds with StatusNotificationResponse.
+4. The Charging Station sends a TransactionEventRequest (eventType = Started) to the CSMS.
+5. The CSMS responds with TransactionEventResponse.
+6. EV Driver presents their IdToken (e.g., RFID card) to the Charging Station.
+7. The Charging Station looks up the IdToken in the Authorization Cache.
+8. The Charging Station finds the token with status Accepted and authorizes locally.
+9. (If cable is not permanently attached) The Charging Station locks the connector.
+10. The Charging Station starts the energy offer.
+11. The Charging Station sends a TransactionEventRequest (eventType = Updated,
+    chargingState = Charging) to the CSMS.
+12. The CSMS responds with TransactionEventResponse (containing current IdTokenInfo).
+
+Expected Result:
+- The driver is authorized without an AuthorizeRequest being sent to the CSMS.
+- Charging begins promptly.
+- The CSMS receives the TransactionEventRequest with the driver's IdToken.
+- The CSMS validates the token and returns the current IdTokenInfo in the response.
+- If the CSMS confirms the token is still Accepted, charging continues uninterrupted.
+
+================================================================================
+TEST CASE 2 - Happy Path: Authorization Cache Updated After CSMS Response
+================================================================================
+Title: Authorization Cache updated with IdTokenInfo from TransactionEventResponse
+
+Description:
+After the CSMS returns IdTokenInfo in the TransactionEventResponse, the Charging
+Station must update the corresponding Authorization Cache entry to keep it current.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- A transaction is in progress that was authorized via the cache
+- The CSMS returns IdTokenInfo in the TransactionEventResponse
+
+Steps:
+1. Complete the steps in Test Case 1 (transaction starts via cache).
+2. The CSMS returns a TransactionEventResponse that includes updated IdTokenInfo
+   for the driver's IdToken.
+3. The Charging Station receives the TransactionEventResponse.
+4. Inspect or query the Authorization Cache entry for the driver's IdToken.
+
+Expected Result:
+- The Charging Station updates the Authorization Cache entry with the IdTokenInfo
+  received from the CSMS.
+- The cache now reflects the latest known status for that IdToken.
+
+================================================================================
+TEST CASE 3 - Happy Path: No AuthorizeRequest Sent for Cached Valid Token
+================================================================================
+Title: Charging Station skips AuthorizeRequest when IdToken is cached as Accepted
+
+Description:
+Confirms that when the Authorization Cache contains a valid (Accepted) IdToken,
+the Charging Station does NOT send a separate AuthorizeRequest to the CSMS.
+Authorization is handled entirely by the cache lookup.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- LocalPreAuthorize = true
+- The driver's IdToken is in the cache with status Accepted and is not expired
+
+Steps:
+1. EV Driver presents their IdToken.
+2. Monitor all messages sent from the Charging Station to the CSMS.
+3. Observe whether an AuthorizeRequest message is sent before or during the
+   TransactionEventRequest.
+
+Expected Result:
+- No AuthorizeRequest is sent to the CSMS.
+- Only a TransactionEventRequest (with the IdToken included) is sent.
+- Authorization is granted locally using the cached entry.
+
+================================================================================
+TEST CASE 4 - Edge Case: Cached Token Is Valid Locally but Invalid at CSMS,
+              StopTxOnInvalidId = true
+================================================================================
+Title: Token valid in cache but revoked at CSMS stops the transaction
+
+Description:
+The IdToken is cached as Accepted on the Charging Station, but by the time the
+CSMS processes the TransactionEventRequest, the token has been revoked or expired
+at the CSMS. The CSMS returns an invalid status in the TransactionEventResponse.
+With StopTxOnInvalidId = true, the Charging Station must stop the transaction.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- LocalPreAuthorize = true
+- The driver's IdToken is in the cache with status Accepted
+- The IdToken has been revoked at the CSMS after being cached
+- StopTxOnInvalidId = true
+
+Steps:
+1. EV Driver presents the IdToken.
+2. The Charging Station authorizes locally via cache and starts charging.
+3. The Charging Station sends a TransactionEventRequest to the CSMS.
+4. The CSMS checks the IdToken, finds it is no longer valid, and returns
+   a TransactionEventResponse with IdTokenInfo.status != Accepted.
+5. The Charging Station receives the response with the invalid status.
+6. The Charging Station evaluates StopTxOnInvalidId.
+
+Expected Result:
+- The Charging Station stops the energy offering.
+- The Charging Station stops the transaction (because StopTxOnInvalidId = true).
+- The Authorization Cache is updated with the invalid IdTokenInfo received.
+- The driver's vehicle stops receiving energy.
+
+================================================================================
+TEST CASE 5 - Edge Case: Cached Token Is Valid Locally but Invalid at CSMS,
+              StopTxOnInvalidId = false
+================================================================================
+Title: Token valid in cache but revoked at CSMS, transaction continues per config
+
+Description:
+Same as Test Case 4, but StopTxOnInvalidId = false. The Charging Station learns
+the token is invalid at the CSMS but does not stop the transaction.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- LocalPreAuthorize = true
+- The driver's IdToken is in the cache with status Accepted
+- The IdToken has been revoked at the CSMS after being cached
+- StopTxOnInvalidId = false
+
+Steps:
+1. EV Driver presents the IdToken.
+2. The Charging Station authorizes locally via cache and starts charging.
+3. The Charging Station sends a TransactionEventRequest to the CSMS.
+4. The CSMS returns a TransactionEventResponse with IdTokenInfo indicating
+   the token is no longer valid.
+5. The Charging Station evaluates StopTxOnInvalidId.
+
+Expected Result:
+- The Charging Station does NOT stop the transaction.
+- Charging continues, subject to MaxEnergyOnInvalidId limits if configured.
+- The Authorization Cache is updated with the invalid status from the CSMS.
+
+================================================================================
+TEST CASE 6 - Edge Case: Cached Token Is Valid Locally but Invalid at CSMS,
+              MaxEnergyOnInvalidId Is Set
+================================================================================
+Title: Energy delivery capped by MaxEnergyOnInvalidId when token is invalid at CSMS
+
+Description:
+The CSMS returns an invalid IdTokenInfo. StopTxOnInvalidId = false but
+MaxEnergyOnInvalidId is configured with a maximum energy value. The Charging
+Station must not exceed that energy limit before stopping.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- LocalPreAuthorize = true
+- IdToken is cached as Accepted but is invalid at the CSMS
+- StopTxOnInvalidId = false
+- MaxEnergyOnInvalidId = some non-zero value (e.g., 5 kWh)
+
+Steps:
+1. EV Driver presents the IdToken.
+2. The Charging Station authorizes locally and starts charging.
+3. The CSMS returns an invalid IdTokenInfo in the TransactionEventResponse.
+4. Charging continues but the Charging Station monitors energy delivered.
+5. Energy delivered reaches the MaxEnergyOnInvalidId threshold.
+
+Expected Result:
+- Charging stops once the MaxEnergyOnInvalidId threshold is reached.
+- The transaction is ended at that point.
+- The driver receives appropriate notification if the station supports display messaging.
+
+================================================================================
+TEST CASE 7 - Edge Case: IdToken in Cache with Status Other Than Accepted,
+              Charging Station is Online
+================================================================================
+Title: Non-Accepted cached status triggers AuthorizeRequest to CSMS
+
+Description:
+The driver presents an IdToken that exists in the Authorization Cache, but its
+cached status is something other than Accepted (e.g., Expired, Blocked, Invalid).
+Since the Charging Station is online, it must send an AuthorizeRequest to the
+CSMS to check the current state of the identifier.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- The driver's IdToken is in the cache with a status other than Accepted
+  (e.g., Expired or Blocked)
+- The Charging Station is online
+
+Steps:
+1. EV Driver presents their IdToken.
+2. The Charging Station looks up the IdToken in the Authorization Cache.
+3. The cache entry is found but has a status other than Accepted.
+4. Monitor messages sent from the Charging Station to the CSMS.
+
+Expected Result:
+- The Charging Station sends an AuthorizeRequest to the CSMS.
+- The Charging Station does NOT immediately authorize the driver locally.
+- The CSMS responds with an AuthorizeResponse containing the current IdTokenInfo.
+- The Authorization Cache is updated with the received IdTokenInfo.
+- Authorization decision is based on the CSMS response.
+
+================================================================================
+TEST CASE 8 - Edge Case: IdToken Not Found in Authorization Cache,
+              Charging Station is Online
+================================================================================
+Title: Unknown IdToken triggers AuthorizeRequest when cache has no entry
+
+Description:
+The driver presents an IdToken that has no entry in the Authorization Cache.
+The Charging Station is online and must send an AuthorizeRequest to the CSMS
+to authorize the driver.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- The driver's IdToken is NOT present in the Authorization Cache
+- The Charging Station is online
+
+Steps:
+1. EV Driver presents their IdToken.
+2. The Charging Station searches the Authorization Cache — no entry found.
+3. Monitor messages sent from the Charging Station to the CSMS.
+
+Expected Result:
+- The Charging Station sends an AuthorizeRequest to the CSMS.
+- If the CSMS responds with Accepted, the Charging Station authorizes and starts
+  the transaction, then adds the IdToken to the Authorization Cache.
+- If the CSMS responds with a non-Accepted status, the driver is rejected.
+
+================================================================================
+TEST CASE 9 - Edge Case: IdToken Not Found in Cache or Local List,
+              Charging Station is Offline, OfflineTxForUnknownIdEnabled = true
+================================================================================
+Title: Unknown IdToken accepted offline when OfflineTxForUnknownIdEnabled is true
+
+Description:
+The Charging Station is offline. The driver presents an IdToken not found in
+either the Authorization Cache or the Local Authorization List.
+OfflineTxForUnknownIdEnabled = true, so the station allows charging anyway.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- The driver's IdToken is NOT in the Authorization Cache
+- The driver's IdToken is NOT in the Local Authorization List
+- The Charging Station is offline
+- OfflineTxForUnknownIdEnabled = true
+
+Steps:
+1. Confirm the Charging Station has no connectivity to the CSMS.
+2. EV Driver presents their IdToken.
+3. The Charging Station checks the Authorization Cache — not found.
+4. The Charging Station checks the Local Authorization List — not found.
+5. The Charging Station evaluates OfflineTxForUnknownIdEnabled.
+
+Expected Result:
+- The Charging Station allows charging for the unknown IdToken.
+- No AuthorizeRequest or TransactionEventRequest is sent (station is offline).
+- Events are queued to be sent when connectivity is restored.
+
+================================================================================
+TEST CASE 10 - Edge Case: IdToken Not Found in Cache or Local List,
+               Charging Station is Offline, OfflineTxForUnknownIdEnabled = false
+================================================================================
+Title: Unknown IdToken rejected offline when OfflineTxForUnknownIdEnabled is false
+
+Description:
+The Charging Station is offline. The driver presents an IdToken not found in
+the Authorization Cache or Local Authorization List.
+OfflineTxForUnknownIdEnabled = false, so the station must reject the driver.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- The driver's IdToken is NOT in the Authorization Cache
+- The driver's IdToken is NOT in the Local Authorization List
+- The Charging Station is offline
+- OfflineTxForUnknownIdEnabled = false
+
+Steps:
+1. Confirm the Charging Station has no connectivity to the CSMS.
+2. EV Driver presents their IdToken.
+3. The Charging Station checks the Authorization Cache — not found.
+4. The Charging Station checks the Local Authorization List — not found.
+5. The Charging Station evaluates OfflineTxForUnknownIdEnabled.
+
+Expected Result:
+- The Charging Station rejects the IdToken.
+- The driver is not authorized to charge.
+- Charging does not start.
+
+================================================================================
+TEST CASE 11 - Failure Scenario: AuthCacheEnabled = false
+================================================================================
+Title: Authorization Cache not consulted when AuthCacheEnabled is false
+
+Description:
+If AuthCacheEnabled is false, the Charging Station must not use the
+Authorization Cache for authorization decisions, even if a matching entry
+exists in the cache.
+
+Prerequisites:
+- AuthCacheEnabled = false
+- The driver's IdToken would otherwise be present in the cache as Accepted
+- The Charging Station is online
+
+Steps:
+1. EV Driver presents their IdToken.
+2. Observe whether the Charging Station consults the Authorization Cache.
+3. Monitor whether an AuthorizeRequest is sent to the CSMS.
+
+Expected Result:
+- The Charging Station does NOT use the Authorization Cache.
+- The Charging Station sends an AuthorizeRequest to the CSMS.
+- Authorization is based solely on the CSMS response.
+
+================================================================================
+TEST CASE 12 - Failure Scenario: LocalPreAuthorize = false
+================================================================================
+Title: Local pre-authorization skipped when LocalPreAuthorize is false
+
+Description:
+LocalPreAuthorize = false means the Charging Station must not locally authorize
+the driver using the cache before confirmation from the CSMS. Even if the token
+is cached as Accepted, the Charging Station waits for CSMS confirmation.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- LocalPreAuthorize = false
+- The driver's IdToken is in the cache with status Accepted
+- The Charging Station is online
+
+Steps:
+1. EV Driver presents their IdToken.
+2. The Charging Station checks the Authorization Cache and finds an Accepted entry.
+3. Observe whether the Charging Station immediately starts charging or waits.
+4. Monitor whether an AuthorizeRequest is sent to the CSMS.
+
+Expected Result:
+- The Charging Station does NOT immediately authorize the driver using the cache.
+- The Charging Station sends an AuthorizeRequest to the CSMS.
+- Charging begins only after the CSMS responds with an Accepted status.
+
+================================================================================
+TEST CASE 13 - Failure Scenario: IdToken Belongs to MasterPassGroupId
+================================================================================
+Title: IdToken with groupId equal to MasterPassGroupId is rejected
+
+Description:
+An IdToken whose groupId matches MasterPassGroupId must never be allowed to start
+a transaction, even if it is present in the Authorization Cache as Accepted.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- LocalPreAuthorize = true
+- The driver's IdToken has a groupId equal to MasterPassGroupId
+- The IdToken may or may not be in the cache
+
+Steps:
+1. EV Driver presents an IdToken whose groupId equals MasterPassGroupId.
+2. The Charging Station inspects the IdToken group information.
+3. Observe whether the Charging Station starts a transaction.
+
+Expected Result:
+- The Charging Station does NOT allow the transaction to start.
+- The IdToken is rejected regardless of its cache status.
+- No energy is offered to the vehicle.
+
+================================================================================
+TEST CASE 14 - Edge Case: Tariff Information Not Stored in Authorization Cache
+================================================================================
+Title: Tariff data is excluded from Authorization Cache entries
+
+Description:
+When the Charging Station supports both Authorization Cache and Tariff/Cost
+information, it must not store tariff data in the cache, since tariff information
+can become outdated and stale cache entries could mislead drivers.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- Tariff & Cost functionality is supported by the Charging Station
+- A transaction is authorized and completed, causing a cache entry to be created
+  or updated
+
+Steps:
+1. Authorize a driver and complete a transaction.
+2. Inspect the Authorization Cache entry that was created or updated for that
+   driver's IdToken.
+3. Check whether any tariff or cost information is stored alongside the
+   IdTokenInfo in the cache entry.
+
+Expected Result:
+- The Authorization Cache entry contains only authorization-related information
+  (e.g., IdToken, status, expiry).
+- No tariff or cost data is present in the cache entry.
+
+================================================================================
+TEST CASE 15 - Edge Case: Personal Data Stored Securely in Authorization Cache
+================================================================================
+Title: Authorization Cache stores IdTokens in a secure (hashed) form
+
+Description:
+The protocol recommends storing personal information (IdTokens) securely,
+for example by storing only hashed IdTokens. This test verifies that the
+Charging Station implementation follows this recommendation.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- The Charging Station has a mechanism to inspect stored cache entries
+
+Steps:
+1. Authorize a driver so their IdToken is stored in the Authorization Cache.
+2. Access the Authorization Cache storage directly (e.g., through a diagnostic
+   interface, log output, or configuration export).
+3. Examine how the IdToken is stored in the cache.
+
+Expected Result:
+- The IdToken is stored in hashed form (not as a plain-text identifier).
+- No raw personal identifiable data is readable from the cache storage.
+
+================================================================================
+TEST CASE 16 - Edge Case: Cached Token Expires Between Cache and CSMS Check
+================================================================================
+Title: Expired cache entry for an IdToken is handled correctly
+
+Description:
+The Authorization Cache entry for the driver's IdToken has passed its expiration
+date/time. The Charging Station should recognize the entry as expired and not
+treat it as Accepted.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- LocalPreAuthorize = true
+- The driver's IdToken is in the cache but the expiration date has passed
+- The Charging Station is online
+
+Steps:
+1. EV Driver presents their IdToken.
+2. The Charging Station looks up the IdToken in the Authorization Cache.
+3. The cache entry is found but is past its expiration date.
+4. Observe whether the Charging Station authorizes locally or escalates to the CSMS.
+
+Expected Result:
+- The Charging Station does NOT authorize the driver using the expired cache entry.
+- The Charging Station sends an AuthorizeRequest to the CSMS to check the
+  current validity of the IdToken.
+- The CSMS response determines whether charging is permitted.
+- The cache entry is updated with the fresh IdTokenInfo from the CSMS.
+
+================================================================================
+TEST CASE 17 - Edge Case: TxStartPoint Configuration Affects Message Sequence
+================================================================================
+Title: Different TxStartPoint values change the order of transaction messages
+
+Description:
+The sequence diagram in C12 assumes TxStartPoint includes EVConnected, Authorized,
+DataSigned, PowerPathClosed, and EnergyTransfer. When TxStartPoint is configured
+differently, the moment the transaction starts (and therefore when TransactionEvent
+messages are sent) may change. This test confirms correct behavior under an
+alternative TxStartPoint configuration.
+
+Prerequisites:
+- AuthCacheEnabled = true
+- LocalPreAuthorize = true
+- The driver's IdToken is cached as Accepted
+- TxStartPoint is set to a non-default configuration (e.g., Authorized only)
+
+Steps:
+1. Configure TxStartPoint to a value different from the default.
+2. EV Driver plugs in the cable and presents their IdToken.
+3. The Charging Station processes the authorization via cache.
+4. Observe the sequence and timing of TransactionEventRequest messages sent.
+
+Expected Result:
+- TransactionEventRequest messages are sent at the points dictated by the
+  configured TxStartPoint value, not the default sequence.
+- Authorization via cache still succeeds without sending an AuthorizeRequest.
+- Charging proceeds correctly once all TxStartPoint conditions are satisfied.
+
+================================================================================
+END OF TEST CASES
+================================================================================

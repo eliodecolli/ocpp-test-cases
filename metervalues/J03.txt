@@ -1,0 +1,72 @@
+J03 - Charging Loop with metering information exchange
+Table 156. J03 - Charging Loop with metering information exchange
+No. Type Description
+1 Name Charging Loop with metering information exchange
+2 ID J03
+Functional block J. Meter Values
+Reference ISO15118-1 F1
+3 Objectives See ISO15118-1, use case Objective F1, page 37.
+4 Description See ISO15118-1, use case Description F1, page 37.
+5 Prerequisites - If authorization according use cases in Functional Block C is applied, it SHALL be finished
+successfully.
+See ISO15118-1, use case Prerequisites F1, page 37.
+6 Actors EV, EVSE, Charging Station
+7 Combined scenario
+description
+15118
+1a. The EV sends a ChargingStatusReq (in case of AC charging) message to the Charging Station,
+upon which EVSE returns a ChargingStatusRes containing the meter value from the fiscal meter.
+1b. The EV sends a CurrentDemandReq (in case of DC charging) message to the Charging
+Station, upon which EVSE returns a CurrentDemandRes containing the meter value from the fiscal
+meter.
+2. The EV sends a MeteringReceiptReq to the Charging Station to acknowledge receipt of the
+meter value.
+Edition 2 FINAL, 2022-12-15 J. MeterValues
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 231/471 Part 2 - Specification
+No. Type Description
+8 Postcondition(s) See ISO15118-1, use case End conditions F1, page 37.
+EV Charging Station CSMS
+15118
+if AC Charging
+ChargingStatusReq()
+ChargingStatusRes(MeterInfoRecord { MeterId,
+[MeterReading], MeterStatus,
+SignedMeterReading, timeStamp },ReceiptRequired: True)
+MeteringReceiptReq(Signature to confirm ChargingStatus Data)
+MeteringReceiptRes()
+OCPP
+TransactionEventRequest(eventType = Updated, transactionID,
+timestamp, chargingState = Charging, Signed metervalues)
+TransactionEventResponse()
+Figure 94. Charging Loop with metering information exchange
+9 Error handling n/a
+10 Remark(s) n/a
+J03 - Charging Loop with metering information exchange - Requirements
+Table 157. J03 - Requirements
+ID Precondition Requirement definition Note
+J03.FR.04 When the Charging Station
+receives ISO 15118 signed
+MeteringReceiptReq message
+from EV
+The Charging Station SHOULD NOT pass the
+meter value from the MeteringReceiptReq
+message to CSMS in a
+TransactionEventRequest (eventType =
+Updated) message. Instead, Charging Station
+sends transaction-related meter values as
+described in use case J02.
+This does not imply that a
+Charging Station cannot require EV
+to send MeteringReceiptReq
+messages. An implementation at a
+Charging Station can be such, that
+every meter value from the fiscal
+meter that is send to CSMS (as per
+use case J02) must first have been
+acknowledged by a
+MeterReceiptReq from the EV.
+Edition 2 FINAL, 2022-12-15 J. MeterValues
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 232/471 Part 2 - Specification
+K. SmartCharging
+Edition 2 FINAL, 2022-12-15 K. SmartCharging
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 233/471 Part 2 - Specification

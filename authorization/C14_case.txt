@@ -1,0 +1,292 @@
+C14 - Online Authorization through Local Authorization List
+Test Cases
+============================================================
+
+Protocol Summary:
+Use case C14 describes how a Charging Station authorizes an EV Driver's IdToken using its
+Local Authorization List while the Charging Station is online. If the IdToken is present
+in the list with status "Accepted," the Charging Station may start charging immediately
+without contacting the CSMS. If the IdToken is absent or has a non-Accepted status, the
+Charging Station must fall back to sending an AuthorizeRequest to the CSMS.
+
+============================================================
+TEST CASE 1
+Title: Happy Path - IdToken found in Local Authorization List with Accepted status
+
+Scenario:
+The EV Driver presents an IdToken that exists in the Local Authorization List with a
+status of Accepted. The Charging Station is online, the Local Authorization List is
+enabled, and LocalPreAuthorize is set to true.
+
+Steps:
+1. Confirm the Local Authorization List is available and enabled (LocalAuthListEnabled = true).
+2. Confirm LocalPreAuthorize is set to true.
+3. Add an IdToken to the Local Authorization List with status "Accepted."
+4. Bring the Charging Station online.
+5. Have the EV Driver present the IdToken at the Charging Station.
+6. Observe whether the Charging Station checks the Local Authorization List.
+7. Observe whether the Charging Station sends an AuthorizeRequest to the CSMS.
+8. Observe whether the Charging Station locks the connector and starts the energy offer.
+
+Expected Result:
+The Charging Station finds the IdToken in the Local Authorization List with status
+Accepted, does NOT send an AuthorizeRequest to the CSMS, locks the connector, and
+starts charging immediately. (Satisfies requirement C14.FR.02)
+
+------------------------------------------------------------
+TEST CASE 2
+Title: Happy Path - IdToken not in Local Authorization List; CSMS grants authorization
+
+Scenario:
+The EV Driver presents an IdToken that is not present in the Local Authorization List.
+The Charging Station is online and must fall back to requesting authorization from the
+CSMS, which responds with Accepted.
+
+Steps:
+1. Confirm the Local Authorization List is available and enabled.
+2. Ensure the presented IdToken is NOT present in the Local Authorization List.
+3. Bring the Charging Station online.
+4. Have the EV Driver present the IdToken at the Charging Station.
+5. Observe that the Charging Station checks the Local Authorization List and does not
+   find the IdToken.
+6. Observe that the Charging Station sends an AuthorizeRequest to the CSMS.
+7. Configure the CSMS to respond with AuthorizeResponse(Accepted).
+8. Observe whether the Charging Station locks the connector and starts the energy offer.
+
+Expected Result:
+The Charging Station does not find the IdToken locally, sends an AuthorizeRequest to
+the CSMS, receives an Accepted response, locks the connector, and starts charging.
+(Satisfies requirement C14.FR.03)
+
+------------------------------------------------------------
+TEST CASE 3
+Title: IdToken in Local Authorization List with non-Accepted status; CSMS grants authorization
+
+Scenario:
+The EV Driver presents an IdToken that exists in the Local Authorization List but with
+a status other than Accepted (e.g., Blocked, Expired, or Invalid). The Charging Station
+must fall back to sending an AuthorizeRequest to the CSMS.
+
+Steps:
+1. Confirm the Local Authorization List is available and enabled.
+2. Add an IdToken to the Local Authorization List with a status of "Blocked" (or any
+   status other than Accepted).
+3. Bring the Charging Station online.
+4. Have the EV Driver present that IdToken at the Charging Station.
+5. Observe that the Charging Station checks the Local Authorization List and finds the
+   IdToken with a non-Accepted status.
+6. Observe that the Charging Station sends an AuthorizeRequest to the CSMS.
+7. Configure the CSMS to respond with AuthorizeResponse(Accepted).
+8. Observe whether the Charging Station locks the connector and starts charging.
+
+Expected Result:
+The Charging Station finds the IdToken in the Local Authorization List with a
+non-Accepted status, sends an AuthorizeRequest to the CSMS, receives an Accepted
+response, and starts charging. (Satisfies requirement C14.FR.03)
+
+------------------------------------------------------------
+TEST CASE 4
+Title: IdToken in Local Authorization List with non-Accepted status; CSMS denies authorization
+
+Scenario:
+The EV Driver presents an IdToken that is in the Local Authorization List with a
+non-Accepted status, and the CSMS also denies authorization.
+
+Steps:
+1. Confirm the Local Authorization List is available and enabled.
+2. Add an IdToken to the Local Authorization List with a status of "Expired."
+3. Bring the Charging Station online.
+4. Have the EV Driver present that IdToken at the Charging Station.
+5. Observe that the Charging Station sends an AuthorizeRequest to the CSMS.
+6. Configure the CSMS to respond with a non-Accepted status (e.g., Invalid or Blocked).
+7. Observe whether the Charging Station starts charging or rejects the session.
+
+Expected Result:
+The Charging Station receives a non-Accepted response from the CSMS, does NOT lock the
+connector, and does NOT start charging. The authorization is rejected.
+
+------------------------------------------------------------
+TEST CASE 5
+Title: Local Authorization List is disabled; Charging Station must contact CSMS
+
+Scenario:
+The Local Authorization List feature is disabled via the LocalAuthListEnabled
+configuration variable. Even if IdTokens would normally be in the list, the Charging
+Station must not use it and must contact the CSMS for all authorizations.
+
+Steps:
+1. Set LocalAuthListEnabled to false on the Charging Station.
+2. Ensure an IdToken is present in the Local Authorization List data structure with
+   status Accepted.
+3. Bring the Charging Station online.
+4. Have the EV Driver present that IdToken at the Charging Station.
+5. Observe whether the Charging Station consults the Local Authorization List.
+6. Observe whether the Charging Station sends an AuthorizeRequest to the CSMS.
+
+Expected Result:
+Because the Local Authorization List is disabled, the Charging Station does not use it
+and sends an AuthorizeRequest to the CSMS for every IdToken, regardless of what is
+stored in the list.
+
+------------------------------------------------------------
+TEST CASE 6
+Title: Local Authorization List has priority over Authorization Cache for the same IdToken
+
+Scenario:
+Both the Local Authorization List and the Authorization Cache are supported and enabled.
+The same IdToken exists in both, but with different statuses (e.g., Blocked in the
+Authorization Cache and Accepted in the Local Authorization List).
+
+Steps:
+1. Confirm both the Authorization Cache and Local Authorization List are available and
+   enabled.
+2. Add the IdToken to the Authorization Cache with status "Blocked."
+3. Add the same IdToken to the Local Authorization List with status "Accepted."
+4. Bring the Charging Station online.
+5. Have the EV Driver present that IdToken at the Charging Station.
+6. Observe which data source the Charging Station uses to make the authorization decision.
+7. Observe whether an AuthorizeRequest is sent to the CSMS.
+8. Observe whether the Charging Station starts charging.
+
+Expected Result:
+The Charging Station uses the Local Authorization List entry (Accepted) and gives it
+priority over the Authorization Cache entry (Blocked). The Charging Station starts
+charging without sending an AuthorizeRequest. (Satisfies requirement C14.FR.01)
+
+------------------------------------------------------------
+TEST CASE 7
+Title: Authorization Cache has priority is NOT given over Local Authorization List
+
+Scenario:
+This is the inverse of Test Case 6. The IdToken has status Accepted in the
+Authorization Cache but is Blocked in the Local Authorization List. Confirms that the
+Local Authorization List always wins.
+
+Steps:
+1. Confirm both the Authorization Cache and Local Authorization List are available and
+   enabled.
+2. Add the IdToken to the Authorization Cache with status "Accepted."
+3. Add the same IdToken to the Local Authorization List with status "Blocked."
+4. Bring the Charging Station online.
+5. Have the EV Driver present that IdToken at the Charging Station.
+6. Observe which data source the Charging Station uses to make the authorization decision.
+
+Expected Result:
+The Charging Station uses the Local Authorization List entry (Blocked), not the
+Authorization Cache entry. It sends an AuthorizeRequest to the CSMS because the local
+status is not Accepted, rather than immediately authorizing from the cache.
+(Satisfies requirement C14.FR.01)
+
+------------------------------------------------------------
+TEST CASE 8
+Title: Empty Local Authorization List - Charging Station falls back to CSMS
+
+Scenario:
+The Local Authorization List is enabled but contains no entries. Any presented IdToken
+will not be found and must be authorized via the CSMS.
+
+Steps:
+1. Confirm the Local Authorization List is enabled and available but contains zero entries
+   (LocalAuthListEntries = 0).
+2. Bring the Charging Station online.
+3. Have the EV Driver present an IdToken.
+4. Observe that the Charging Station searches the Local Authorization List and finds
+   no match.
+5. Observe that the Charging Station sends an AuthorizeRequest to the CSMS.
+6. Configure the CSMS to respond with Accepted.
+7. Observe whether charging starts.
+
+Expected Result:
+The Charging Station finds no match in the empty list, sends an AuthorizeRequest to the
+CSMS, receives Accepted, and starts charging.
+
+------------------------------------------------------------
+TEST CASE 9
+Title: Local Authorization List at maximum capacity - New entry accepted and usable
+
+Scenario:
+The Local Authorization List is at its maximum number of entries
+(LocalAuthListEntries reports the maximum). A new update is sent and a new IdToken is
+added. The new IdToken should still be authorizable.
+
+Steps:
+1. Fill the Local Authorization List to its reported maximum capacity.
+2. Send a SendLocalList update to add one more IdToken with status Accepted (replacing
+   or incrementally adding as supported).
+3. Bring the Charging Station online.
+4. Have the EV Driver present the newly added IdToken.
+5. Observe whether the Charging Station finds it in the Local Authorization List and
+   starts charging without contacting the CSMS.
+
+Expected Result:
+If the update was successfully applied, the Charging Station finds the new IdToken with
+status Accepted and starts charging without sending an AuthorizeRequest.
+
+------------------------------------------------------------
+TEST CASE 10
+Title: LocalPreAuthorize is false - Charging Station contacts CSMS even for Accepted entries
+
+Scenario:
+LocalPreAuthorize is set to false. Even though the IdToken is in the Local Authorization
+List with status Accepted, the Charging Station should not locally authorize without
+contacting the CSMS first (per prerequisites of the use case).
+
+Steps:
+1. Set LocalPreAuthorize to false.
+2. Add an IdToken to the Local Authorization List with status Accepted.
+3. Bring the Charging Station online.
+4. Have the EV Driver present that IdToken.
+5. Observe whether the Charging Station sends an AuthorizeRequest to the CSMS.
+
+Expected Result:
+Because LocalPreAuthorize is false, the Charging Station does not use the Local
+Authorization List for immediate authorization and instead sends an AuthorizeRequest to
+the CSMS. This tests that the prerequisite (LocalPreAuthorize = true) is enforced
+before C14.FR.02 applies.
+
+------------------------------------------------------------
+TEST CASE 11
+Title: Tariff notification is provided when tariff is cached in the Local Authorization List
+
+Scenario:
+The Local Authorization List entry for the IdToken includes a cached tariff
+(e.g., 0.23/kWh). After local authorization, the Charging Station optionally displays
+or notifies the EV Driver of the tariff before starting the session.
+
+Steps:
+1. Add an IdToken to the Local Authorization List with status Accepted and an associated
+   cached tariff of 0.23/kWh.
+2. Bring the Charging Station online.
+3. Have the EV Driver present the IdToken.
+4. Observe whether the Charging Station locally authorizes without contacting the CSMS.
+5. Observe whether a tariff notification is issued to the EV Driver (optional behavior
+   as shown in the sequence diagram).
+6. Observe whether the connector locks and charging begins.
+
+Expected Result:
+The Charging Station locally authorizes the IdToken, optionally notifies the EV Driver
+of the tariff (0.23/kWh), locks the connector, and starts the energy offer.
+
+------------------------------------------------------------
+TEST CASE 12
+Title: Failure Postcondition - Local Authorization List not accepted due to misconfiguration
+
+Scenario:
+The Local Authorization List is unavailable (LocalAuthListAvailable = false) or
+improperly configured, causing the Charging Station to be unable to accept tokens via
+the local list.
+
+Steps:
+1. Set LocalAuthListAvailable to false or otherwise make the Local Authorization List
+   unavailable.
+2. Add an IdToken to the Local Authorization List data structure with status Accepted
+   (even though the feature is reported as unavailable).
+3. Bring the Charging Station online.
+4. Have the EV Driver present that IdToken.
+5. Observe the Charging Station behavior: does it use the list or fall back to the CSMS?
+
+Expected Result:
+Because the Local Authorization List is not available, the Charging Station does not use
+it to authorize the token. It either falls back to the CSMS or rejects the token if no
+fallback is possible. The failure postcondition (Charging Station does not accept tokens
+on the Local Authorization List) is confirmed.

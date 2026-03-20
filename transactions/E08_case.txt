@@ -1,0 +1,213 @@
+E08 - Transaction stopped while Charging Station is offline
+Test Cases
+================================================================================
+
+TC-E08-001
+Title: Stop energy offering when same IdToken is presented
+Requirement: E08.FR.01
+Steps:
+  1. A transaction is active on the Charging Station and the Charging Station is offline.
+  2. Present the same IdToken that was used to start the transaction at the Charging Station.
+  3. Observe the Charging Station behavior.
+Expected Result:
+  The Charging Station stops energy delivery to the EV immediately upon recognizing the matching IdToken.
+  No energy is transferred to the EV after the IdToken is accepted.
+
+--------------------------------------------------------------------------------
+
+TC-E08-002
+Title: Stop energy offering when IdToken with matching GroupId is presented
+Requirement: E08.FR.02
+Steps:
+  1. A transaction is active on the Charging Station and the Charging Station is offline.
+  2. Present a different IdToken that shares the same GroupId as the IdToken used to start the transaction.
+  3. Observe the Charging Station behavior.
+Expected Result:
+  The Charging Station stops energy delivery to the EV immediately upon recognizing the matching GroupId.
+  No energy is transferred to the EV after the IdToken is accepted.
+
+--------------------------------------------------------------------------------
+
+TC-E08-003
+Title: Connector unlocked when same IdToken is presented and cable is not permanently attached
+Requirement: E08.FR.01, E08.FR.03
+Steps:
+  1. Ensure the connector is not permanently attached (i.e., the cable is removable).
+  2. A transaction is active on the Charging Station and the Charging Station is offline.
+  3. Present the same IdToken that was used to start the transaction.
+  4. Observe the connector lock state.
+Expected Result:
+  The Charging Station stops energy offering (per FR.01) and unlocks the connector.
+  The connector transitions to the unlocked state, allowing the cable to be removed.
+
+--------------------------------------------------------------------------------
+
+TC-E08-004
+Title: Connector unlocked when GroupId-matching IdToken is presented and cable is not permanently attached
+Requirement: E08.FR.02, E08.FR.03
+Steps:
+  1. Ensure the connector is not permanently attached (i.e., the cable is removable).
+  2. A transaction is active on the Charging Station and the Charging Station is offline.
+  3. Present an IdToken whose GroupId matches the GroupId of the IdToken used to start the transaction.
+  4. Observe the connector lock state.
+Expected Result:
+  The Charging Station stops energy offering (per FR.02) and unlocks the connector.
+  The connector transitions to the unlocked state, allowing the cable to be removed.
+
+--------------------------------------------------------------------------------
+
+TC-E08-005
+Title: Connector remains locked when cable is permanently attached
+Requirement: E08.FR.03
+Steps:
+  1. Ensure the connector is permanently attached (i.e., the cable cannot be detached).
+  2. A transaction is active on the Charging Station and the Charging Station is offline.
+  3. Present the same IdToken that was used to start the transaction.
+  4. Observe the connector lock state.
+Expected Result:
+  The Charging Station stops energy offering.
+  The connector is NOT unlocked; it remains in its locked or fixed state because the cable is permanently attached.
+
+--------------------------------------------------------------------------------
+
+TC-E08-006
+Title: TransactionEventRequest with eventType Ended is generated on stop
+Requirement: E08.FR.01, E08.FR.04
+Steps:
+  1. A transaction is active on the Charging Station and the Charging Station is offline.
+  2. Present the same IdToken used to start the transaction.
+  3. Observe whether the Charging Station generates a TransactionEventRequest.
+Expected Result:
+  The Charging Station generates a TransactionEventRequest message with the field eventType set to "Ended".
+  This message is created locally on the Charging Station even while offline.
+
+--------------------------------------------------------------------------------
+
+TC-E08-007
+Title: TransactionEventRequest with eventType Ended is generated when GroupId-matching IdToken stops transaction
+Requirement: E08.FR.02, E08.FR.04
+Steps:
+  1. A transaction is active on the Charging Station and the Charging Station is offline.
+  2. Present an IdToken whose GroupId matches the GroupId of the IdToken used to start the transaction.
+  3. Observe whether the Charging Station generates a TransactionEventRequest.
+Expected Result:
+  The Charging Station generates a TransactionEventRequest message with the field eventType set to "Ended".
+  This message is created locally on the Charging Station even while offline.
+
+--------------------------------------------------------------------------------
+
+TC-E08-008
+Title: TransactionEventRequest messages are queued while offline
+Requirement: E08.FR.05
+Steps:
+  1. Ensure the Charging Station is offline (no connection to the CSMS).
+  2. A transaction is active; present the stopping IdToken to trigger a stop.
+  3. Observe whether the Charging Station attempts to immediately send TransactionEventRequest or queues it.
+Expected Result:
+  The Charging Station does not attempt to send the TransactionEventRequest to the CSMS while offline.
+  The message is held in the Charging Station's internal queue for later delivery.
+  No transmission to CSMS occurs until connectivity is restored.
+
+--------------------------------------------------------------------------------
+
+TC-E08-009
+Title: Queued TransactionEventRequest messages are sent after connection is restored
+Requirement: E08.FR.06
+Steps:
+  1. A transaction is stopped while the Charging Station is offline, producing one or more queued TransactionEventRequest messages (per FR.05).
+  2. Restore the network connection between the Charging Station and the CSMS.
+  3. Observe the messages sent by the Charging Station to the CSMS.
+Expected Result:
+  After the connection is restored, the Charging Station sends all queued TransactionEventRequest messages to the CSMS.
+  Each previously queued TransactionEventRequest is transmitted; none are permanently discarded.
+  The CSMS receives the TransactionEventRequest with eventType set to "Ended".
+
+--------------------------------------------------------------------------------
+
+TC-E08-010
+Title: offline flag is set to TRUE on TransactionEventRequest generated while offline
+Requirement: E08.FR.07
+Steps:
+  1. A transaction is stopped while the Charging Station is offline.
+  2. Allow the connection to be restored so the queued TransactionEventRequest is transmitted to the CSMS.
+  3. Inspect the TransactionEventRequest received by the CSMS.
+Expected Result:
+  The TransactionEventRequest message contains the field "offline" set to TRUE.
+  This applies to every TransactionEventRequest that was generated during the offline period.
+
+--------------------------------------------------------------------------------
+
+TC-E08-011
+Title: seqNo field is correctly set on TransactionEventRequest
+Requirement: E08.FR.08
+Steps:
+  1. A transaction is active and is stopped while the Charging Station is offline, producing a TransactionEventRequest (eventType = Ended).
+  2. If additional TransactionEventRequest messages were created during the session (e.g., Started, Updated), note the sequence order.
+  3. Restore connectivity and allow the queued messages to be sent to the CSMS.
+  4. Inspect the seqNo field of each received TransactionEventRequest.
+Expected Result:
+  Each TransactionEventRequest contains a seqNo field whose value is assigned according to the Sequence Number Generation specification.
+  The seqNo values are monotonically increasing within the same transaction, with no gaps, enabling the CSMS to verify completeness of transaction information.
+
+--------------------------------------------------------------------------------
+
+TC-E08-012
+Title: Configured measurands are included in meterValue field of TransactionEventRequest (eventType = Ended)
+Requirement: E08.FR.09
+Steps:
+  1. Configure the Charging Station to send meter data in TransactionEventRequest (eventType = Ended) by setting the appropriate meter value configuration.
+  2. Start and then stop a transaction while the Charging Station is offline.
+  3. Restore connectivity and allow the queued TransactionEventRequest (eventType = Ended) to be sent to the CSMS.
+  4. Inspect the meterValue field of the received TransactionEventRequest.
+Expected Result:
+  The TransactionEventRequest with eventType "Ended" contains the optional meterValue field.
+  The meterValue field includes all measurands that have been configured for inclusion.
+  The values reflect the usage data from the transaction.
+
+--------------------------------------------------------------------------------
+
+TC-E08-013
+Title: Meter data may be dropped when Charging Station is low on memory
+Requirement: E08.FR.09, E08.FR.10
+Steps:
+  1. Configure the Charging Station to send meter data in TransactionEventRequest (eventType = Ended).
+  2. Induce a low-memory condition on the Charging Station (e.g., through a large volume of stored data or a simulated memory constraint).
+  3. Stop a transaction while the Charging Station is offline.
+  4. Restore connectivity and inspect the received TransactionEventRequest (eventType = Ended).
+Expected Result:
+  The Charging Station is permitted (but not required) to omit some or all meter data from the meterValue field of the TransactionEventRequest (eventType = Ended).
+  The TransactionEventRequest is still generated and sent; only the meter data within it may be absent or reduced.
+
+--------------------------------------------------------------------------------
+
+TC-E08-014
+Title: When dropping meter data, intermediate values are dropped first
+Requirement: E08.FR.10, E08.FR.11
+Steps:
+  1. Configure the Charging Station to send meter data in TransactionEventRequest (eventType = Ended).
+  2. Induce a low-memory condition on the Charging Station so that it must drop meter values.
+  3. Stop a transaction while the Charging Station is offline, resulting in a list of sampled meter values.
+  4. Restore connectivity and inspect the meterValue list in the received TransactionEventRequest (eventType = Ended).
+Expected Result:
+  The Charging Station drops intermediate values first: values at odd-indexed positions (1st, 3rd, 5th, etc.) are removed before values at the boundaries of the list.
+  The Charging Station does NOT drop values starting from the beginning of the list and does NOT stop adding values to the list from the end.
+  The remaining values in the meterValue field reflect the dropping of intermediate entries.
+
+--------------------------------------------------------------------------------
+
+TC-E08-015
+Title: Signed meter values are placed in signedMeterValue field when SampledDataSignReadings is true
+Requirement: E08.FR.12
+Steps:
+  1. Set the configuration parameter SampledDataSignReadings to true on the Charging Station.
+  2. Start and then stop a transaction while the Charging Station is offline.
+  3. Restore connectivity and inspect the TransactionEventRequest (eventType = Ended) received by the CSMS.
+  4. Examine the sampledValues entries within the meterValue field.
+Expected Result:
+  The Charging Station retrieves signed meter values from its meter hardware.
+  Each relevant sampledValue entry contains the signedMeterValue field populated with the signed meter reading data.
+  The signedMeterValue field is not empty or absent when SampledDataSignReadings is true.
+
+================================================================================
+END OF TEST CASES
+================================================================================

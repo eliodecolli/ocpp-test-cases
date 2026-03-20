@@ -1,0 +1,131 @@
+B02 - Cold Boot Charging Station - Pending - Test Cases
+
+GOAL: Define behavior when the CSMS responds to a BootNotification with status "Pending" — the station is not yet accepted, the CSMS may configure it, and normal OCPP communication is restricted until accepted.
+
+================================================================================
+
+TEST CASE 1: CSMS receives Pending boot — can send configuration messages
+Scenario: After a Pending response, the CSMS sends GetVariables and/or SetVariables to configure the station before accepting it.
+Steps:
+  1. Charging Station sends BootNotificationRequest.
+  2. CSMS responds with BootNotificationResponse(status = Pending, interval = X).
+  3. CSMS sends GetVariablesRequest (B06) and/or SetVariablesRequest (B05) to the Charging Station.
+  4. Charging Station responds to each request.
+Expected result:
+  - Charging Station successfully responds to GetVariables and SetVariables during Pending.
+  - Communication channel remains open.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 2: Charging Station does not send unsolicited messages while Pending
+Scenario: While in Pending status, the station must not send OCPP CALL messages on its own (unless triggered).
+Steps:
+  1. Charging Station is in Pending status.
+  2. Charging Station has a CALL message it would normally send (e.g., StatusNotification).
+Expected result:
+  - Charging Station does NOT send the message spontaneously.
+  - If it does send such a message, the CSMS responds with CALLERROR: SecurityError.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 3: CSMS triggers a message during Pending — station complies
+Scenario: CSMS sends TriggerMessageRequest, GetBaseReportRequest, or GetReportRequest while station is Pending.
+Steps:
+  1. Charging Station is in Pending status.
+  2. CSMS sends TriggerMessageRequest (or GetBaseReportRequest or GetReportRequest).
+  3. Charging Station sends the triggered message.
+Expected result:
+  - Charging Station sends the triggered message as instructed.
+  - This is the only scenario where the station may send non-Boot messages during Pending.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 4: RequestStartTransaction rejected while Pending
+Scenario: CSMS sends a RequestStartTransactionRequest while station is in Pending status.
+Steps:
+  1. Charging Station is in Pending status.
+  2. CSMS sends RequestStartTransactionRequest.
+  3. Charging Station responds.
+Expected result:
+  - Charging Station responds with RequestStartTransactionResponse with status Rejected.
+  - Even if the station is configured to allow local transactions, this remote command is rejected.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 5: RequestStopTransaction rejected while Pending
+Scenario: CSMS sends a RequestStopTransactionRequest while station is in Pending status.
+Steps:
+  1. Charging Station is in Pending status.
+  2. CSMS sends RequestStopTransactionRequest.
+Expected result:
+  - Charging Station responds with RequestStopTransactionResponse with status Rejected.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 6: Communication channel stays open during Pending
+Scenario: Verify neither side closes the connection during Pending status.
+Steps:
+  1. CSMS sends BootNotificationResponse(status = Pending).
+  2. Both parties remain connected.
+Expected result:
+  - Neither the Charging Station nor the CSMS closes the WebSocket connection.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 7: Retry BootNotification after Pending interval (interval > 0)
+Scenario: CSMS returns a Pending response with a positive interval.
+Steps:
+  1. CSMS responds with BootNotificationResponse(status = Pending, interval = X, where X > 0).
+  2. Charging Station waits X seconds.
+  3. Charging Station sends BootNotificationRequest again.
+Expected result:
+  - Charging Station does not send the retry before X seconds have elapsed.
+  - After X seconds, BootNotificationRequest is resent.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 8: Retry BootNotification when interval is 0
+Scenario: CSMS returns a Pending response with interval = 0.
+Steps:
+  1. CSMS responds with BootNotificationResponse(status = Pending, interval = 0).
+  2. Charging Station needs to resend BootNotificationRequest.
+Expected result:
+  - Charging Station chooses its own waiting interval.
+  - Interval is reasonable to avoid flooding the CSMS.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 9: Station may queue transactions during Pending (if configured)
+Scenario: CSO has configured the station to allow transactions before being accepted.
+Steps:
+  1. Charging Station is in Pending status and configured to allow local transactions.
+  2. An EV user initiates a local transaction.
+  3. Charging Station accepts the transaction and queues the TransactionEventRequest.
+Expected result:
+  - Transaction is queued for later delivery.
+  - It is understood these messages may never be delivered if acceptance is never granted.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 10: Station does NOT retry before the interval expires
+Scenario: Ensure the station respects the Pending retry interval and does not retry early.
+Steps:
+  1. CSMS responds with BootNotificationResponse(status = Pending, interval = 60).
+  2. Only 30 seconds have passed.
+  3. Verify whether the station sends another BootNotificationRequest.
+Expected result:
+  - The station does NOT send another BootNotificationRequest before 60 seconds.
+  - Exception: if CSMS sends a TriggerMessageRequest for BootNotification.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 11: Unauthorized message from station during Pending triggers SecurityError
+Scenario: The Charging Station sends an unauthorized CALL message (not BootNotification or triggered).
+Steps:
+  1. Charging Station is in Pending status.
+  2. Charging Station sends a StatusNotificationRequest (or any other non-permitted CALL) on its own.
+  3. CSMS receives the message.
+Expected result:
+  - CSMS responds with CALLERROR: SecurityError.
+
+--------------------------------------------------------------------------------

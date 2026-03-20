@@ -1,0 +1,376 @@
+C03 - Authorization using Credit/Debit Card
+Test Cases
+================================================================================
+
+OVERVIEW
+--------
+Protocol C03 describes how an EV Driver authorizes and starts a charging session
+by using a credit or debit card at a payment terminal (either built into the
+Charging Station or at a central kiosk). Authorization is handled externally by
+a Payment System, which notifies the CSMS. The CSMS then generates a unique
+IdToken of type Central and sends a RequestStartTransactionRequest to the
+Charging Station to begin charging.
+
+Actors: EV Driver, Payment System, CSMS, Charging Station
+
+================================================================================
+HAPPY PATH TEST CASES
+================================================================================
+
+TC-C03-01: Successful end-to-end authorization and charging start
+-----------
+Scenario:
+  An EV Driver plugs in their vehicle and uses a valid credit card at the
+  terminal. The payment is approved, and charging starts successfully.
+
+Steps:
+  1. The EV Driver plugs the charging cable into the vehicle and the Charging
+     Station.
+  2. Verify the Charging Station sends a StatusNotificationRequest to the CSMS
+     reflecting the cable-connected state.
+  3. Verify the Charging Station sends a TransactionEventRequest with
+     eventType = Started to the CSMS.
+  4. The EV Driver presents a valid credit card at the payment terminal.
+  5. The terminal communicates with the payment back-office and the payment is
+     approved.
+  6. The Payment System sends an authorization message to the CSMS.
+  7. Verify the CSMS generates a unique IdToken (IdTokenType = Central).
+  8. Verify the CSMS sends a RequestStartTransactionRequest containing the
+     generated IdToken to the Charging Station.
+  9. Verify the Charging Station responds with a RequestStartTransactionResponse
+     with status = Accepted.
+  10. Verify the Charging Station begins delivering energy to the vehicle.
+  11. Verify the Charging Station sends a TransactionEventRequest with
+      eventType = Updated to the CSMS indicating charging has started.
+
+Expected Result:
+  The transaction is started and energy delivery begins. The CSMS receives
+  confirmation that charging is active. All messages are exchanged in the
+  correct sequence without errors.
+
+--------------------------------------------------------------------------------
+
+TC-C03-02: Successful authorization using a debit card
+-----------
+Scenario:
+  Same as TC-C03-01 but the EV Driver uses a debit card instead of a credit
+  card. The protocol behavior should be identical.
+
+Steps:
+  1. The EV Driver plugs in the charging cable.
+  2. The EV Driver presents a valid debit card at the payment terminal.
+  3. The terminal communicates with the payment back-office and approves the
+     payment.
+  4. The Payment System notifies the CSMS of authorization.
+  5. Verify the CSMS generates a unique Central IdToken and sends a
+     RequestStartTransactionRequest to the Charging Station.
+  6. Verify the Charging Station responds with Accepted and starts charging.
+  7. Verify the Charging Station sends a TransactionEventRequest with
+     eventType = Updated.
+
+Expected Result:
+  The charging session starts successfully. No difference in behavior compared
+  to a credit card transaction.
+
+--------------------------------------------------------------------------------
+
+TC-C03-03: Authorization via central payment kiosk serving multiple Charging Stations
+-----------
+Scenario:
+  Multiple Charging Stations share one central payment terminal/kiosk. The EV
+  Driver uses the kiosk to pay and selects the correct Charging Station.
+
+Steps:
+  1. The EV Driver plugs the cable into one of the group's Charging Stations.
+  2. Verify that Charging Station sends StatusNotificationRequest and
+     TransactionEventRequest (eventType = Started) to the CSMS.
+  3. The EV Driver goes to the central kiosk, selects the correct Charging
+     Station, and pays with a valid card.
+  4. The kiosk's payment back-office approves the payment and notifies the CSMS,
+     identifying which Charging Station the authorization is for.
+  5. Verify the CSMS sends RequestStartTransactionRequest with a Central IdToken
+     to the correct Charging Station only.
+  6. Verify that Charging Station responds with Accepted and begins charging.
+  7. Verify no RequestStartTransactionRequest is sent to the other Charging
+     Stations in the group.
+
+Expected Result:
+  Only the selected Charging Station starts a session. Other stations in the
+  group are unaffected.
+
+================================================================================
+REQUIREMENT-SPECIFIC TEST CASES
+================================================================================
+
+TC-C03-04: Charging Station does not send AuthorizeRequest for Central IdTokenType (C03.FR.01)
+-----------
+Scenario:
+  When the CSMS sends a RequestStartTransactionRequest with a Central IdTokenType,
+  the Charging Station must not attempt to independently re-authorize the token
+  by sending an AuthorizeRequest back to the CSMS.
+
+Steps:
+  1. Complete the payment and authorization steps so that the CSMS sends a
+     RequestStartTransactionRequest to the Charging Station with an IdToken of
+     type Central.
+  2. Monitor all messages sent from the Charging Station to the CSMS after
+     receiving the RequestStartTransactionRequest.
+  3. Verify the Charging Station does NOT send an AuthorizeRequest for the
+     received Central IdToken.
+  4. Verify the Charging Station sends a RequestStartTransactionResponse with
+     status = Accepted.
+  5. Verify the Charging Station starts charging normally.
+
+Expected Result:
+  No AuthorizeRequest is sent by the Charging Station. The Charging Station
+  trusts the CSMS-initiated request directly and proceeds to accept and start
+  the transaction.
+
+--------------------------------------------------------------------------------
+
+TC-C03-05: Central IdToken is not stored in the Authorization Cache (C03.FR.02)
+-----------
+Scenario:
+  A Charging Station that has an Authorization Cache enabled must not cache any
+  IdTokenInfo received for an IdToken of type Central, regardless of what
+  message it arrived in.
+
+Steps:
+  1. Confirm the Charging Station has an Authorization Cache implemented and
+     enabled.
+  2. Complete the full C03 authorization flow so that the Charging Station
+     receives an IdToken of type Central (e.g., via RequestStartTransactionRequest
+     or any associated response).
+  3. After the transaction completes, inspect the Charging Station's
+     Authorization Cache (via diagnostics, configuration read, or a subsequent
+     test probe).
+  4. Verify that no entry for the Central IdToken exists in the cache.
+
+Expected Result:
+  The Authorization Cache contains no record of the Central IdToken or its
+  associated IdTokenInfo. The cache is unchanged compared to before the
+  transaction.
+
+================================================================================
+EDGE CASE TEST CASES
+================================================================================
+
+TC-C03-06: Cable plugged in but card payment is never completed
+-----------
+Scenario:
+  The EV Driver plugs in the cable but walks away without paying. No
+  authorization message is ever sent from the Payment System to the CSMS.
+
+Steps:
+  1. The EV Driver plugs the charging cable into the Charging Station.
+  2. Verify the Charging Station sends StatusNotificationRequest and
+     TransactionEventRequest (eventType = Started) to the CSMS.
+  3. No payment card is presented. Wait for a reasonable timeout period.
+  4. Verify the CSMS does not send a RequestStartTransactionRequest.
+  5. Verify the Charging Station does not begin charging.
+  6. Observe any timeout or idle state behavior on the Charging Station.
+
+Expected Result:
+  No charging session is started. The Charging Station remains in a waiting or
+  idle state. No energy is delivered.
+
+--------------------------------------------------------------------------------
+
+TC-C03-07: Payment System sends authorization before cable is plugged in
+-----------
+Scenario:
+  The Payment System authorizes a user before the EV Driver has plugged in the
+  cable. The CSMS may receive an authorization without an active transaction
+  event.
+
+Steps:
+  1. No cable is plugged in at the Charging Station.
+  2. The EV Driver pays at the terminal and the Payment System sends an
+     authorization message to the CSMS.
+  3. The CSMS generates a Central IdToken and sends a
+     RequestStartTransactionRequest to the Charging Station.
+  4. Observe the Charging Station's response when no cable is connected.
+  5. The EV Driver then plugs in the cable within the allowed window (if any).
+
+Expected Result:
+  The Charging Station either rejects the RequestStartTransactionRequest
+  (because no cable is present) or holds the authorization pending cable
+  connection, depending on implementation. Charging must not start without a
+  connected cable.
+
+--------------------------------------------------------------------------------
+
+TC-C03-08: CSMS generates a non-unique IdToken (duplicate)
+-----------
+Scenario:
+  The CSMS fails to generate a truly unique IdToken and produces a value that
+  collides with an IdToken already in use by another active session.
+
+Steps:
+  1. Have at least one active charging session with a known Central IdToken.
+  2. A new EV Driver completes payment and the Payment System notifies the CSMS.
+  3. The CSMS (in this error scenario) generates an IdToken value that duplicates
+     the one already in use.
+  4. The CSMS sends a RequestStartTransactionRequest with the duplicate IdToken
+     to the Charging Station.
+  5. Observe the behavior of the Charging Station and CSMS.
+
+Expected Result:
+  Ideally the CSMS prevents duplicate IdToken generation. If a duplicate is
+  sent, the Charging Station should still accept the request (as it does not
+  validate uniqueness), but the CSMS must detect and handle the collision to
+  prevent billing or session tracking errors. No existing session should be
+  disrupted.
+
+--------------------------------------------------------------------------------
+
+TC-C03-09: Multiple rapid card taps on the same terminal
+-----------
+Scenario:
+  An EV Driver taps their card multiple times rapidly (e.g., due to impatience).
+  The Payment System might send multiple authorization messages to the CSMS.
+
+Steps:
+  1. The EV Driver plugs in the cable.
+  2. The EV Driver taps the same card multiple times at the terminal in quick
+     succession.
+  3. The Payment System sends one or more authorization messages to the CSMS.
+  4. The CSMS processes the message(s) and sends RequestStartTransactionRequest
+     to the Charging Station.
+  5. Observe whether multiple requests are sent to the Charging Station and how
+     it handles them.
+
+Expected Result:
+  Only one charging session is started. Duplicate authorization messages should
+  be deduplicated by the Payment System or CSMS. The Charging Station must not
+  start multiple overlapping sessions for the same connector.
+
+================================================================================
+FAILURE / NEGATIVE TEST CASES
+================================================================================
+
+TC-C03-10: Payment is declined by the Payment System
+-----------
+Scenario:
+  The EV Driver presents a card that is declined (e.g., insufficient funds,
+  expired card). The Payment System does not send an authorization to the CSMS.
+
+Steps:
+  1. The EV Driver plugs in the charging cable.
+  2. The EV Driver presents a card that will be declined.
+  3. The payment terminal or back-office declines the transaction.
+  4. Verify the Payment System does NOT send an authorization message to the
+     CSMS.
+  5. Verify the CSMS does NOT send a RequestStartTransactionRequest.
+  6. Verify the Charging Station does NOT begin charging.
+  7. Verify the EV Driver receives an appropriate decline indication at the
+     terminal.
+
+Expected Result:
+  No charging session is initiated. The Charging Station remains idle. The
+  decline is visible to the EV Driver at the terminal.
+
+--------------------------------------------------------------------------------
+
+TC-C03-11: CSMS is unreachable when Payment System sends authorization
+-----------
+Scenario:
+  The CSMS is offline or unreachable at the moment the Payment System sends the
+  authorization message. The CSMS cannot forward the start request to the
+  Charging Station.
+
+Steps:
+  1. The EV Driver plugs in the cable.
+  2. The EV Driver completes payment and the Payment System attempts to send
+     authorization to the CSMS.
+  3. The CSMS is unavailable (network outage or service down).
+  4. Observe whether the Payment System retries or reports an error.
+  5. Verify the Charging Station does not start charging during the outage.
+  6. Once the CSMS comes back online, observe whether the authorization can be
+     replayed or whether the session must be restarted.
+
+Expected Result:
+  Charging does not start while the CSMS is unreachable. The EV Driver is
+  notified of the failure. When the CSMS recovers, it handles the pending
+  authorization gracefully (either retries or requires a new payment).
+
+--------------------------------------------------------------------------------
+
+TC-C03-12: Charging Station rejects the RequestStartTransactionRequest
+-----------
+Scenario:
+  The Charging Station receives a valid RequestStartTransactionRequest from the
+  CSMS but responds with a status other than Accepted (e.g., Rejected or a
+  fault condition).
+
+Steps:
+  1. The EV Driver completes payment and the CSMS sends a valid
+     RequestStartTransactionRequest with a Central IdToken.
+  2. The Charging Station is in a state where it cannot start a session (e.g.,
+     a fault, connector unavailable, or firmware issue).
+  3. The Charging Station responds with RequestStartTransactionResponse with
+     status != Accepted.
+  4. Observe the CSMS behavior after receiving the rejection.
+  5. Verify no charging occurs.
+
+Expected Result:
+  The CSMS receives the rejection response and must not assume charging has
+  started. The CSMS should inform the Payment System or EV Driver that the
+  session could not be started (and a refund or void may be required). The
+  Charging Station sends no TransactionEventRequest with eventType = Updated for
+  active charging.
+
+--------------------------------------------------------------------------------
+
+TC-C03-13: Communication failure between CSMS and Charging Station after payment approval
+-----------
+Scenario:
+  The Payment System successfully authorizes the transaction and notifies the
+  CSMS, but the connection between the CSMS and the Charging Station is lost
+  before the RequestStartTransactionRequest is delivered.
+
+Steps:
+  1. The EV Driver plugs in and pays. The Payment System notifies the CSMS.
+  2. The CSMS generates a Central IdToken and attempts to send
+     RequestStartTransactionRequest to the Charging Station.
+  3. The network link between the CSMS and Charging Station drops before the
+     message is received.
+  4. Observe whether the CSMS retries the request once the connection is
+     restored.
+  5. Observe the Charging Station state during the outage.
+  6. Verify the Charging Station does not start charging without receiving the
+     valid RequestStartTransactionRequest.
+
+Expected Result:
+  The Charging Station does not start charging on its own. Once reconnected, the
+  CSMS retries the request or handles the outstanding authorization. The EV
+  Driver is informed of the delay or failure.
+
+--------------------------------------------------------------------------------
+
+TC-C03-14: RequestStartTransactionRequest received without a prior payment authorization
+-----------
+Scenario:
+  A RequestStartTransactionRequest with a Central IdToken arrives at the Charging
+  Station, but it was not preceded by a valid Payment System authorization (e.g.,
+  a replayed or spoofed message).
+
+Steps:
+  1. No EV Driver has made a payment at the terminal.
+  2. A RequestStartTransactionRequest with IdTokenType = Central is sent to the
+     Charging Station (simulating a replay or out-of-order message).
+  3. Observe whether the Charging Station processes and accepts the request.
+  4. Verify whether the CSMS has any mechanism to detect that no corresponding
+     payment authorization exists.
+
+Expected Result:
+  From the Charging Station's perspective, it accepts any valid
+  RequestStartTransactionRequest from the CSMS regardless of payment history
+  (payment validation is the CSMS's responsibility). The CSMS should have
+  safeguards to only send such requests in response to legitimate Payment System
+  authorizations. This test validates that the overall system has proper
+  authorization controls at the CSMS level.
+
+================================================================================
+END OF TEST CASES
+================================================================================

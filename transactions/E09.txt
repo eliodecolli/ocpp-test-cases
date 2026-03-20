@@ -1,0 +1,127 @@
+E09 - When cable disconnected on EV-side: Stop Transaction
+Table 112. E09 - When cable disconnected on EV-side: Stop Transaction
+No. Type Description
+1 Name When cable disconnected on EV-side: Stop Transaction
+2 ID E09
+Functional block E. Transactions
+Parent use case E09 - When cable disconnected on EV-side: Suspend Transaction
+5 Prerequisite(s) Configuration Variable: StopTxOnEVSideDisconnect = true
+A transaction is ongoing
+6 Postcondition(s) Successful postcondition:
+The Charging Station is in Idle status.
+Failure postcondition:
+n/a
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 154/471 Part 2 - Specification
+EV DriverCharging Station CSMS
+A transaction is ongoing.
+unplug cable at car side
+suspend energy offer
+TransactionEventRequest(eventType = Ended, transactionId = AB1234, seqN = N + 1, timestamp,triggerReason = EVCommunicationLost, stoppedReason = EVDisconnected, meterValues)
+TransactionEventResponse()
+alt[if cable not permanently attached & UnlockOnEVSideDisconnect = true]
+unlock connector
+[if cable not permanently attached & UnlockOnEVSideDisconnect = false]
+User authorization successful.
+unlock connector
+Unplug cable
+StatusNotificationRequest(Available)
+StatusNotificationResponse()
+Figure 59. Sequence Diagram: When cable disconnected on EV-side: Stop Transaction
+7 Error handling n/a
+8 Remark(s) When the Charging Cable is plugged back in, the charging will not resume/continue.
+The scenario description and sequence diagram above are based on the Configuration Variable
+for stop transaction being configured as follows.
+TxStopPoint: Authorized
+This use-case is also valid for other configurations, but then the transaction might stop at another
+moment, which might change the sequence in which message are sent. For more details see the
+use case: E09 - When cable disconnected on EV-side: Stop Transaction - Requirements
+Table 113. E09 - Requirements
+ID Precondition Requirement definition Note
+E09.FR.01 If StopTxOnEVSideDisconnect =
+true .
+The transaction SHALL be deauthorized when the
+cable is disconnected from the EV. If the EV is
+reconnected, energy transfer is not allowed until the
+transaction is authorized once again.
+Setting
+StopTxOnEVSideDisc
+onnect to true will
+prevent sabotage acts
+when unplugging not
+locked cables on EV side.
+E09.FR.02 E09.FR.01
+AND
+the cable is not permanently attached
+AND
+UnlockOnEvSideDisconnect =
+true.
+The Charging Station SHALL unlock the Charging
+Cable.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 155/471 Part 2 - Specification
+ID Precondition Requirement definition Note
+E09.FR.03 E09.FR.01
+AND
+the cable is not permanently attached
+AND
+UnlockOnEvSideDisconnect =
+false.
+The Charging Station SHALL unlock the Charging
+Cable only after authorization by the EV Driver.
+E09.FR.04 When a TransactionEventRequest has
+to be created
+The Charging Station SHALL set the message’s
+seqNo field as specified in Sequence Number
+Generation.
+This enables the CSMS
+to track the
+completeness of
+transaction information
+E09.FR.05 When configured to send meter data
+in the TransactionEventRequest
+(eventType = Ended), See: Meter
+Values - Configuration
+The Charging Station SHALL add the configured
+measurands to the optional meterValue field in the
+TransactionEventRequest(eventType = Ended) sent
+to the CSMS to provide more details about
+transaction usage.
+E09.FR.06 E09.FR.05
+AND
+The Charging Station is running low on
+memory
+The Charging Station MAY drop meter data in the
+TransactionEventRequest(eventType = Ended)
+message.
+E09.FR.07 E09.FR.06 When dropping meter data, the Charging Station
+SHALL drop intermediate values first (1st value, 3th
+value, 5th etc), not start dropping values from the
+start of the list or stop adding values to the list.
+E09.FR.08 SampledDataSignReadings is true The Charging Station SHALL retrieve signed meter
+values and put them in the signedMeterValue field
+of sampledValues.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 156/471 Part 2 - Specification
+E09 - When cable disconnected on EV-side: Stop Transaction
+5 Prerequisite(s) Configuration Variable: StopTxOnEVSideDisconnect = false
+A transaction is ongoing
+6 Postcondition(s) Successful postcondition:
+The Charging Station is in Idle status.
+The regular transaction is resumed.
+Failure postcondition:
+n/a
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 157/471 Part 2 - Specification
+EV DriverCharging Station CSMS
+A transaction is ongoing.
+unplug cable at car side
+suspend energy offer
+TransactionEventRequest(eventType = Updated, transactionId = AB1234, seqNo = N + 1,timestamp, chargingState = SuspendedEV, triggerReason = EVCommunicationLost, meterValues)
+TransactionEventResponse()
+alt[if Cable is plugged in]
+plugin cable
+resume energy offer
+TransactionEventRequest(eventType = Updated, transactionId = AB1234, seqNo = N + 2,timestamp, chargingState = Charging, triggerReason = CablePluggedIn, meterValues)
+TransactionEventResponse()
+Continue with 

@@ -1,0 +1,314 @@
+Test Cases for C13 - Offline Authorization through Local Authorization List
+OCPP 2.0.1 Edition 2
+=========================================================================
+
+OVERVIEW
+--------
+Use case C13 describes how a Charging Station authorizes an EV Driver's IdToken
+when it cannot communicate with the Charge Station Management System (CSMS), i.e.
+when it is offline. Authorization is performed by checking a Local Authorization
+List (LAL) stored on the Charging Station itself.
+
+=========================================================================
+HAPPY PATH TEST CASES
+=========================================================================
+
+TC-C13-01: Successful offline authorization with Accepted token
+---------------------------------------------------------------
+Title: EV Driver authorized offline via Local Authorization List
+
+Scenario:
+  The Charging Station loses connection to the CSMS. An EV Driver presents an
+  IdToken that is present in the Local Authorization List with status "Accepted".
+
+Prerequisites:
+  - Local Authorization List is loaded on the Charging Station.
+  - LocalAuthListEnabled is set to true.
+  - The Charging Station is offline (connection to CSMS is lost).
+  - The EV Driver's IdToken exists in the Local Authorization List with status "Accepted".
+  - OfflineTxForUnknownIdEnabled is false.
+
+Steps:
+  1. Simulate or confirm the Charging Station has lost its connection to the CSMS.
+  2. The EV Driver presents their IdToken (e.g., RFID card) at the Charging Station.
+  3. The Charging Station checks its Local Authorization List for the presented IdToken.
+  4. Observe the Charging Station's response.
+
+Expected Result:
+  - The Charging Station finds the IdToken in the Local Authorization List with status "Accepted".
+  - The Charging Station accepts the IdToken and authorizes the session locally without contacting the CSMS.
+  - The connector is locked and energy offer is started.
+  - Charging begins successfully.
+
+
+TC-C13-02: Optional tariff notification displayed during offline authorization
+------------------------------------------------------------------------------
+Title: Cached tariff information shown to EV Driver during offline session
+
+Scenario:
+  The Charging Station is offline and authorizes a token from the Local Authorization
+  List. A cached tariff (e.g., 0.23/kWh) is available and displayed to the EV Driver.
+
+Prerequisites:
+  - All prerequisites from TC-C13-01 apply.
+  - A cached tariff (e.g., 0.23/kWh) is stored on the Charging Station.
+
+Steps:
+  1. Simulate or confirm the Charging Station has lost its connection to the CSMS.
+  2. The EV Driver presents an IdToken that is "Accepted" in the Local Authorization List.
+  3. The Charging Station checks its Local Authorization List and finds an "Accepted" entry.
+  4. Observe whether the tariff notification is provided to the EV Driver.
+
+Expected Result:
+  - The Charging Station optionally notifies the EV Driver of the cached tariff (e.g., 0.23/kWh).
+  - The connector is locked and charging starts.
+  - The optional notification does not block or delay authorization.
+
+
+=========================================================================
+EDGE CASE TEST CASES
+=========================================================================
+
+TC-C13-03: Local Authorization List entry takes priority over Authorization Cache
+----------------------------------------------------------------------------------
+Title: LAL entry overrides conflicting Authorization Cache entry for the same IdToken
+
+Scenario:
+  Both the Local Authorization List (LAL) and the Authorization Cache are supported
+  and contain entries for the same IdToken but with different statuses. The LAL entry
+  must take priority.
+
+Prerequisites:
+  - The Charging Station supports both the Authorization Cache and the Local Authorization List.
+  - LocalAuthListEnabled is set to true.
+  - The Charging Station is offline.
+  - The EV Driver's IdToken is present in both the Authorization Cache and the Local Authorization List.
+  - The Authorization Cache has status "Blocked" for the IdToken.
+  - The Local Authorization List has status "Accepted" for the IdToken.
+
+Steps:
+  1. Simulate or confirm the Charging Station is offline.
+  2. The EV Driver presents the IdToken that exists in both stores.
+  3. The Charging Station evaluates both the Local Authorization List and the Authorization Cache.
+  4. Observe which result is applied.
+
+Expected Result:
+  - The Charging Station uses the Local Authorization List entry, ignoring the conflicting Authorization Cache entry.
+  - The IdToken is accepted because the LAL status is "Accepted".
+  - Charging begins successfully.
+  - The Authorization Cache entry does not override the LAL decision.
+
+
+TC-C13-04: Local Authorization List entry takes priority — Cache says Accepted, LAL says Blocked
+-------------------------------------------------------------------------------------------------
+Title: LAL "Blocked" entry overrides Authorization Cache "Accepted" entry
+
+Scenario:
+  The Authorization Cache has status "Accepted" for an IdToken, but the Local
+  Authorization List has status "Blocked". The LAL must take priority.
+
+Prerequisites:
+  - The Charging Station supports both the Authorization Cache and the Local Authorization List.
+  - LocalAuthListEnabled is set to true.
+  - The Charging Station is offline.
+  - The EV Driver's IdToken is in the Authorization Cache with status "Accepted".
+  - The same IdToken is in the Local Authorization List with status "Blocked".
+
+Steps:
+  1. Simulate or confirm the Charging Station is offline.
+  2. The EV Driver presents the IdToken.
+  3. The Charging Station evaluates both the Local Authorization List and the Authorization Cache.
+  4. Observe the authorization decision.
+
+Expected Result:
+  - The Charging Station uses the Local Authorization List entry.
+  - The IdToken is rejected because the LAL status is "Blocked".
+  - Charging does not start.
+  - The Authorization Cache "Accepted" entry is not used.
+
+
+TC-C13-05: IdToken in LAL with status other than Accepted (e.g., Blocked or Expired)
+--------------------------------------------------------------------------------------
+Title: IdToken present in LAL but not with "Accepted" status is rejected offline
+
+Scenario:
+  The Charging Station is offline. An EV Driver presents an IdToken that exists
+  in the Local Authorization List but with a non-Accepted status such as "Blocked",
+  "Expired", or "Invalid".
+
+Prerequisites:
+  - LocalAuthListEnabled is set to true.
+  - The Charging Station is offline.
+  - The EV Driver's IdToken is in the Local Authorization List with a status other than "Accepted" (e.g., "Blocked").
+  - OfflineTxForUnknownIdEnabled is false.
+
+Steps:
+  1. Simulate or confirm the Charging Station is offline.
+  2. The EV Driver presents the IdToken.
+  3. The Charging Station checks the Local Authorization List and finds the IdToken with a non-Accepted status.
+  4. Observe the authorization response.
+
+Expected Result:
+  - The Charging Station rejects the IdToken.
+  - Charging does not start.
+  - The EV Driver is notified that their token is not authorized.
+
+
+TC-C13-06: Offline authorization when LocalAuthListEnabled is false
+--------------------------------------------------------------------
+Title: Local Authorization List is disabled — offline authorization via LAL fails
+
+Scenario:
+  The Charging Station is offline but the Local Authorization List feature has
+  been disabled via configuration. Authorization via the LAL should not occur.
+
+Prerequisites:
+  - LocalAuthListEnabled is set to false.
+  - The Charging Station is offline.
+  - The EV Driver's IdToken is in the Local Authorization List with status "Accepted".
+  - OfflineTxForUnknownIdEnabled is false.
+
+Steps:
+  1. Set LocalAuthListEnabled to false on the Charging Station.
+  2. Simulate or confirm the Charging Station is offline.
+  3. The EV Driver presents the IdToken.
+  4. The Charging Station attempts to authorize the IdToken.
+
+Expected Result:
+  - The Charging Station does not use the Local Authorization List.
+  - The IdToken is not authorized offline.
+  - Charging does not start.
+
+
+TC-C13-07: OfflineTxForUnknownIdEnabled is true — unknown token is accepted offline
+-------------------------------------------------------------------------------------
+Title: Any IdToken accepted offline when OfflineTxForUnknownIdEnabled is true
+
+Scenario:
+  The Charging Station is offline and OfflineTxForUnknownIdEnabled is set to true.
+  An EV Driver presents an IdToken that is NOT present in the Local Authorization List
+  or Authorization Cache. The token should still be accepted.
+
+Prerequisites:
+  - LocalAuthListEnabled is set to true (or false — does not affect this requirement).
+  - The Charging Station is offline.
+  - OfflineTxForUnknownIdEnabled is set to true.
+  - The EV Driver's IdToken is NOT present in the Local Authorization List or Authorization Cache.
+
+Steps:
+  1. Set OfflineTxForUnknownIdEnabled to true on the Charging Station.
+  2. Simulate or confirm the Charging Station is offline.
+  3. The EV Driver presents an IdToken that is not in the Local Authorization List.
+  4. The Charging Station attempts to authorize the IdToken.
+
+Expected Result:
+  - The Charging Station allows the unknown IdToken to authorize a transaction.
+  - Charging begins.
+  - The unknown identifier is not rejected.
+
+
+TC-C13-08: Offline authorization attempted with an empty Local Authorization List
+----------------------------------------------------------------------------------
+Title: No entries in Local Authorization List — known token cannot be authorized offline
+
+Scenario:
+  The Local Authorization List has not been populated (it is empty). The Charging
+  Station is offline and an EV Driver presents their IdToken.
+
+Prerequisites:
+  - LocalAuthListEnabled is set to true.
+  - The Local Authorization List is empty (no entries).
+  - The Charging Station is offline.
+  - OfflineTxForUnknownIdEnabled is false.
+
+Steps:
+  1. Confirm the Local Authorization List is empty on the Charging Station.
+  2. Simulate or confirm the Charging Station is offline.
+  3. The EV Driver presents their IdToken.
+  4. The Charging Station checks the Local Authorization List.
+
+Expected Result:
+  - The Charging Station finds no entry for the IdToken in the Local Authorization List.
+  - The IdToken is rejected.
+  - Charging does not start.
+
+
+=========================================================================
+FAILURE / NEGATIVE TEST CASES
+=========================================================================
+
+TC-C13-09: IdToken not found in Local Authorization List while offline
+-----------------------------------------------------------------------
+Title: Unknown IdToken rejected offline when OfflineTxForUnknownIdEnabled is false
+
+Scenario:
+  The Charging Station is offline. An EV Driver presents an IdToken that is not
+  present in the Local Authorization List. OfflineTxForUnknownIdEnabled is false,
+  so unknown identifiers must not be authorized.
+
+Prerequisites:
+  - LocalAuthListEnabled is set to true.
+  - The Charging Station is offline.
+  - The EV Driver's IdToken is NOT in the Local Authorization List.
+  - OfflineTxForUnknownIdEnabled is false.
+
+Steps:
+  1. Simulate or confirm the Charging Station is offline.
+  2. The EV Driver presents an IdToken not found in the Local Authorization List.
+  3. The Charging Station searches the Local Authorization List and finds no matching entry.
+  4. Observe the authorization result.
+
+Expected Result:
+  - The Charging Station rejects the IdToken.
+  - Charging does not start.
+  - The EV Driver is informed their token was not accepted.
+
+
+TC-C13-10: Charging Station comes back online — verify normal authorization resumes
+------------------------------------------------------------------------------------
+Title: Reconnection to CSMS restores online authorization flow
+
+Scenario:
+  After a period of offline operation (using the Local Authorization List), the
+  Charging Station reconnects to the CSMS. Subsequent authorization requests should
+  be handled by the CSMS again, not solely by the LAL.
+
+Prerequisites:
+  - The Charging Station was previously offline and authorizing via the LAL.
+  - The Charging Station re-establishes connection to the CSMS.
+
+Steps:
+  1. Confirm the Charging Station has regained its connection to the CSMS.
+  2. The EV Driver presents an IdToken.
+  3. The Charging Station processes the authorization request.
+
+Expected Result:
+  - The Charging Station sends the authorization request to the CSMS (online path).
+  - The session follows the standard online authorization use case, not C13.
+  - The Local Authorization List may still be used as a fallback if configured, but the CSMS is the primary authority.
+
+
+TC-C13-11: Local Authorization List not available on the Charging Station
+--------------------------------------------------------------------------
+Title: Missing Local Authorization List prevents offline authorization
+
+Scenario:
+  The Charging Station is offline, but no Local Authorization List has ever been
+  downloaded or is unavailable. Offline authorization via the LAL cannot proceed.
+
+Prerequisites:
+  - Local Authorization List is not available (never synchronized or cleared).
+  - The Charging Station is offline.
+  - OfflineTxForUnknownIdEnabled is false.
+
+Steps:
+  1. Confirm the Local Authorization List is absent or unavailable on the Charging Station.
+  2. Simulate or confirm the Charging Station is offline.
+  3. The EV Driver presents their IdToken.
+  4. The Charging Station attempts to perform offline authorization.
+
+Expected Result:
+  - The Charging Station cannot authorize the IdToken offline.
+  - The IdToken is rejected.
+  - Charging does not start.
+  - A failure postcondition is reached: the Charging Station does not accept tokens when the LAL is unavailable.

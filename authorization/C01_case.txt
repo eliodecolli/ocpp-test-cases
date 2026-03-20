@@ -1,0 +1,409 @@
+C01 - EV Driver Authorization using RFID
+Test Cases
+================================================================================
+
+OVERVIEW
+--------
+Protocol C01 defines how a Charging Station authorizes an EV Driver via RFID
+before allowing or stopping a charging session. The Charging Station sends an
+AuthorizeRequest to the CSMS (Charging Station Management System), which replies
+with an AuthorizeResponse indicating acceptance or a reason for rejection.
+Authorization also governs which EVSEs (charging connectors) a token is permitted
+to use and supports language-specific display messages and group/master-pass logic.
+
+================================================================================
+HAPPY PATH TEST CASES
+================================================================================
+
+TC-C01-001
+Title: Successful Authorization - Token Not in Local Cache
+Scenario:
+  A driver presents an RFID card that is not stored in the Charging Station's
+  Local Authorization List or Authorization Cache. AuthEnabled is true.
+Steps:
+  1. Set AuthEnabled = true on the Charging Station.
+  2. Driver presents a valid RFID card at the Charging Station.
+  3. Confirm the token is absent from the Local Authorization List and
+     Authorization Cache.
+  4. Observe the Charging Station send an AuthorizeRequest to the CSMS.
+  5. CSMS responds with AuthorizeResponse where idTokenInfo.status = Accepted
+     and evseId list is empty or absent.
+Expected Result:
+  The Charging Station receives the Accepted response and allows the driver to
+  start charging. No EVSE restriction is applied.
+
+--------------------------------------------------------------------------------
+
+TC-C01-002
+Title: Successful Authorization - Token Accepted for All EVSEs
+Scenario:
+  The CSMS determines the presented token is valid and permitted on every EVSE
+  at the Charging Station.
+Steps:
+  1. Driver presents a valid RFID card.
+  2. Charging Station sends AuthorizeRequest to the CSMS.
+  3. CSMS responds with AuthorizeResponse, idTokenInfo.status = Accepted,
+     evseId list empty or absent.
+Expected Result:
+  The Charging Station allows charging on any available EVSE. Energy is offered
+  after authorization is confirmed.
+
+--------------------------------------------------------------------------------
+
+TC-C01-003
+Title: Successful Authorization - Token Accepted for a Subset of EVSEs
+Scenario:
+  The CSMS determines the token is valid but only permitted on specific EVSEs
+  (e.g., EVSE 1 and EVSE 3 out of four available).
+Steps:
+  1. Driver presents a valid RFID card.
+  2. Charging Station sends AuthorizeRequest to the CSMS.
+  3. CSMS responds with AuthorizeResponse, idTokenInfo.status = Accepted,
+     evseId list = [1, 3].
+Expected Result:
+  The Charging Station allows charging only on EVSE 1 and EVSE 3. EVSEs 2 and 4
+  are not offered to the driver.
+
+--------------------------------------------------------------------------------
+
+TC-C01-004
+Title: Stopping a Session - Same Token That Started It
+Scenario:
+  A driver presents the same RFID card that was used to start an ongoing
+  transaction, intending to stop charging.
+Steps:
+  1. A transaction is active, authorized by Token A.
+  2. Driver presents Token A again at the Charging Station.
+  3. Observe whether the Charging Station sends an AuthorizeRequest.
+Expected Result:
+  The Charging Station ends the authorization immediately without sending an
+  AuthorizeRequest to the CSMS. Energy delivery stops. Depending on
+  TxStopPoint configuration, the transaction may also be ended.
+
+--------------------------------------------------------------------------------
+
+TC-C01-005
+Title: Stopping a Session - Group Token from Local Authorization List
+Scenario:
+  A driver presents a different RFID card that belongs to the same group as
+  the token that started the session, and the group token is found in the Local
+  Authorization List with a valid status.
+Steps:
+  1. A transaction is active, authorized by Token A (GroupIdToken = Group1).
+  2. Driver presents Token B (also GroupIdToken = Group1, status Valid) which
+     is present in the Local Authorization List.
+  3. Observe whether the Charging Station sends an AuthorizeRequest.
+Expected Result:
+  The Charging Station ends the authorization without sending an AuthorizeRequest.
+  Energy delivery stops.
+
+--------------------------------------------------------------------------------
+
+TC-C01-006
+Title: Authorization Response Includes GroupIdToken
+Scenario:
+  The presented RFID token has an associated groupIdToken configured in the CSMS.
+Steps:
+  1. Driver presents an RFID card whose idToken is linked to a groupIdToken in
+     the CSMS.
+  2. Charging Station sends AuthorizeRequest.
+  3. CSMS processes the request and recognizes the associated groupIdToken.
+  4. CSMS sends AuthorizeResponse.
+Expected Result:
+  The AuthorizeResponse includes the associated groupIdToken in the response
+  payload alongside the authorization status.
+
+--------------------------------------------------------------------------------
+
+TC-C01-007
+Title: Display Message in language1 When Supported
+Scenario:
+  The AuthorizeResponse includes language1 = "fr-FR" and the Charging Station
+  has French messages installed.
+Steps:
+  1. CSMS sends AuthorizeResponse with language1 = "fr-FR".
+  2. Charging Station checks its installed message languages.
+  3. French messages are available.
+Expected Result:
+  The Charging Station displays all user-facing messages in French (fr-FR).
+
+--------------------------------------------------------------------------------
+
+TC-C01-008
+Title: Display Message in language2 When language1 Is Not Available
+Scenario:
+  The AuthorizeResponse includes language1 = "fr-FR" (not installed) and
+  language2 = "de-DE" (installed).
+Steps:
+  1. CSMS sends AuthorizeResponse with language1 = "fr-FR", language2 = "de-DE".
+  2. Charging Station checks for French messages - not found.
+  3. Charging Station checks for German messages - found.
+Expected Result:
+  The Charging Station displays messages in German (de-DE) as the fallback.
+
+--------------------------------------------------------------------------------
+
+TC-C01-009
+Title: Master Pass Stops One or More Active Transactions
+Scenario:
+  An authorized Master Pass token is used to stop ongoing transactions. This
+  requires MasterPassGroupId to be configured and the driver's token to have
+  a matching groupId.
+Steps:
+  1. One or more transactions are active on the Charging Station.
+  2. MasterPassGroupId is configured on the Charging Station.
+  3. Driver presents an RFID card whose groupId equals the configured
+     MasterPassGroupId.
+  4. Charging Station sends AuthorizeRequest to the CSMS.
+  5. CSMS responds with AuthorizeResponse containing GroupId = MasterPassGroupId.
+  6. Charging Station shows Master Pass UI (if available) allowing selection of
+     transaction(s) to stop.
+  7. Driver selects transaction(s).
+  8. Charging Station stops energy offer, unlocks connector (if not permanently
+     attached), and sends TransactionEventRequest with eventType = Ended,
+     stopReason = MasterPass.
+Expected Result:
+  The selected transaction(s) are stopped. CSMS receives TransactionEventRequest
+  for each stopped transaction and responds with TransactionEventResponse.
+
+================================================================================
+EDGE CASE TEST CASES
+================================================================================
+
+TC-C01-010
+Title: Token Present in Local Authorization List - AuthorizeRequest Optional
+Scenario:
+  The RFID token is already present in the Local Authorization List. The
+  Charging Station decides whether to still contact the CSMS.
+Steps:
+  1. Driver presents an RFID card that exists in the Local Authorization List.
+  2. Observe whether the Charging Station sends an AuthorizeRequest to the CSMS.
+Expected Result:
+  Sending an AuthorizeRequest is optional (MAY). The Charging Station may
+  authorize locally or choose to contact the CSMS. Either behavior is compliant.
+  If it does send an AuthorizeRequest, the normal request/response flow applies.
+
+--------------------------------------------------------------------------------
+
+TC-C01-011
+Title: Language Fields - language1 Not Set, language2 Also Must Not Be Set
+Scenario:
+  The AuthorizeResponse has language1 absent. Validate that language2 is also
+  absent.
+Steps:
+  1. CSMS prepares an AuthorizeResponse without setting language1.
+  2. CSMS sends the response to the Charging Station.
+Expected Result:
+  language2 is not set in the response. If language2 were set without language1,
+  that would be a protocol violation.
+
+--------------------------------------------------------------------------------
+
+TC-C01-012
+Title: language1 and language2 Must Be Different Values
+Scenario:
+  Verify that a response with language1 and language2 set to the same value is
+  invalid.
+Steps:
+  1. Attempt to send an AuthorizeResponse with language1 = "en-US" and
+     language2 = "en-US".
+Expected Result:
+  This configuration is a protocol violation. The Charging Station or CSMS
+  should treat language1 and language2 as distinct fields and they must differ.
+  The system should not set both fields to the same language tag.
+
+--------------------------------------------------------------------------------
+
+TC-C01-013
+Title: Language Tags Formatted as RFC-4646 / RFC-5646
+Scenario:
+  Verify that language fields use the correct RFC-5646 format (e.g., "en-US",
+  "fr-FR") rather than free-form text.
+Steps:
+  1. CSMS sends AuthorizeResponse with language1 = "English" (incorrect format).
+  2. Compare against a valid response where language1 = "en-US".
+Expected Result:
+  Only RFC-5646 formatted language tags are valid. The value "English" does not
+  conform to the specification. The Charging Station should use the RFC-5646
+  formatted tag to match installed languages.
+
+--------------------------------------------------------------------------------
+
+TC-C01-014
+Title: Neither language1 Nor language2 Match Installed Languages
+Scenario:
+  Both language fields are set but neither matches any language installed on
+  the Charging Station.
+Steps:
+  1. CSMS sends AuthorizeResponse with language1 = "zh-CN", language2 = "ja-JP".
+  2. Charging Station has neither Chinese nor Japanese messages installed.
+Expected Result:
+  The Charging Station falls back to English for displaying messages, as
+  recommended by the specification.
+
+--------------------------------------------------------------------------------
+
+TC-C01-015
+Title: AuthorizeRequest Used Only for Identifier Authorization
+Scenario:
+  Ensure that AuthorizeRequest is not sent for any purpose other than
+  authorizing an identifier (e.g., not for status checks or data queries).
+Steps:
+  1. Review all scenarios where the Charging Station initiates an
+     AuthorizeRequest.
+  2. Verify the request is triggered solely by the need to authorize an idToken.
+Expected Result:
+  AuthorizeRequest is only sent when an RFID card is presented and authorization
+  is required. It is never used for other communication purposes.
+
+--------------------------------------------------------------------------------
+
+TC-C01-016
+Title: Active Transaction With Revoked Token - New Different Token Presented
+Scenario:
+  An active transaction was authorized by Token A, but Token A's authorization
+  has since been revoked. A different Token B is then presented.
+Steps:
+  1. A transaction is active, initially authorized by Token A.
+  2. Token A's authorization is revoked (it is no longer valid for charging).
+  3. Driver presents Token B (different from Token A).
+  4. Charging Station receives Token B.
+Expected Result:
+  The Charging Station should not allow Token B to authorize on this transaction.
+  If the Charging Station does send an AuthorizeRequest for Token B, the CSMS
+  should respond with idTokenInfo.status = NotAtThisTime. Multiple tokens per
+  transaction are most likely not supported.
+
+--------------------------------------------------------------------------------
+
+TC-C01-017
+Title: Master Pass UI Timeout - No Selection Made
+Scenario:
+  The Master Pass UI is shown but the driver does not select any transaction
+  before the timeout expires.
+Steps:
+  1. Driver presents a Master Pass RFID card.
+  2. CSMS responds with AuthorizeResponse confirming the Master Pass.
+  3. Master Pass UI is displayed on the Charging Station.
+  4. Driver does not interact with the UI and the acceptable timeout elapses.
+Expected Result:
+  The Charging Station reverts to normal operation. No transactions are stopped.
+  The Charging Station does not remain stuck in an intermediate state.
+
+================================================================================
+FAILURE / REJECTION TEST CASES
+================================================================================
+
+TC-C01-018
+Title: Token Rejected - Not Authorized
+Scenario:
+  The CSMS does not recognize or accept the presented RFID token.
+Steps:
+  1. Driver presents an RFID card that the CSMS does not recognize.
+  2. Charging Station sends AuthorizeRequest to the CSMS.
+  3. CSMS responds with AuthorizeResponse, idTokenInfo.status = Invalid (or
+     another rejection status from AuthorizationStatusEnumType).
+Expected Result:
+  The Charging Station does not allow charging. An appropriate rejection message
+  is shown to the driver. Energy is not offered.
+
+--------------------------------------------------------------------------------
+
+TC-C01-019
+Title: Token Valid but Not Allowed for This Type of EVSE
+Scenario:
+  The idToken is valid in the CSMS, but the driver is not permitted to charge
+  at the type of EVSE the Charging Station provides (e.g., the token is for
+  AC charging but the station only has DC chargers).
+Steps:
+  1. Driver presents a valid RFID card.
+  2. Charging Station sends AuthorizeRequest.
+  3. CSMS verifies the token is valid but detects a mismatch with EVSE type.
+  4. CSMS responds with AuthorizeResponse, idTokenInfo.status =
+     NotAllowedTypeEVSE.
+Expected Result:
+  The Charging Station does not allow charging and informs the driver that their
+  token is not allowed for the type of charger available at this location.
+
+--------------------------------------------------------------------------------
+
+TC-C01-020
+Title: Token Not Allowed at This Location
+Scenario:
+  The idToken is valid but explicitly not permitted at this particular Charging
+  Station location.
+Steps:
+  1. Driver presents a valid RFID card.
+  2. Charging Station sends AuthorizeRequest.
+  3. CSMS responds with AuthorizeResponse, idTokenInfo.status =
+     NotAtThisLocation, evseId list is empty or absent.
+Expected Result:
+  The Charging Station does not allow charging. The driver is notified that
+  their token is not authorized at this location. The empty evseId list
+  clearly differentiates this from a token allowed on all EVSEs.
+
+--------------------------------------------------------------------------------
+
+TC-C01-021
+Title: AuthEnabled Is False - No Authorization Required
+Scenario:
+  The Charging Station's AuthEnabled configuration is set to false.
+Steps:
+  1. Set AuthEnabled = false on the Charging Station.
+  2. Driver approaches the Charging Station without presenting any RFID card.
+Expected Result:
+  The Charging Station does not require authorization and may offer energy
+  without an RFID card being presented. No AuthorizeRequest is sent.
+
+--------------------------------------------------------------------------------
+
+TC-C01-022
+Title: AuthorizeResponse Missing Status Field
+Scenario:
+  The CSMS sends an AuthorizeResponse that does not include an authorization
+  status value.
+Steps:
+  1. Driver presents an RFID card.
+  2. Charging Station sends AuthorizeRequest.
+  3. CSMS sends a malformed AuthorizeResponse with no idTokenInfo.status field.
+Expected Result:
+  The Charging Station treats the response as invalid. It should not grant
+  authorization. The protocol requires that AuthorizeResponse always includes
+  an authorization status value.
+
+--------------------------------------------------------------------------------
+
+TC-C01-023
+Title: No Response from CSMS to AuthorizeRequest
+Scenario:
+  The CSMS does not respond to the AuthorizeRequest (e.g., network outage or
+  CSMS failure).
+Steps:
+  1. Driver presents an RFID card.
+  2. Charging Station sends AuthorizeRequest.
+  3. CSMS does not send any AuthorizeResponse within an expected timeout window.
+Expected Result:
+  The Charging Station handles the timeout gracefully. Depending on its
+  offline/fallback configuration, it either denies authorization or falls back
+  to local authorization methods (Local Authorization List or Authorization
+  Cache). Charging does not begin in an indeterminate state.
+
+--------------------------------------------------------------------------------
+
+TC-C01-024
+Title: Token Allowed on Subset of EVSEs - Attempt to Use Disallowed EVSE
+Scenario:
+  The AuthorizeResponse grants access only to EVSE 2, but the driver tries to
+  plug in at EVSE 1.
+Steps:
+  1. Driver presents a valid RFID card.
+  2. CSMS responds with AuthorizeResponse, idTokenInfo.status = Accepted,
+     evseId list = [2].
+  3. Driver attempts to initiate charging on EVSE 1.
+Expected Result:
+  The Charging Station refuses to start charging on EVSE 1. Only EVSE 2 is
+  unlocked or offered for charging, as specified in the AuthorizeResponse.
+
+================================================================================
+END OF TEST CASES
+================================================================================

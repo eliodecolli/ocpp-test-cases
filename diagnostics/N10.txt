@@ -1,0 +1,144 @@
+N10 - Clear Customer Information
+Table 232. N10 - Clear Customer Information
+No. Type Description
+1 Name Clear Customer Information
+2 ID N10
+Functional block N. Diagnostics
+3 Objective(s) To enable the CSMS to clear (and retrieve) raw customer information from a Charging Station.
+4 Description The CSMS sends a message to the Charging Station to clear (and retrieve) raw customer
+information, for example to be compliant with local privacy laws. The Charging Station notifies
+the CSMS by sending one or more reports.
+Actors Charging Station, CSMS
+Edition 2 FINAL, 2022-12-15 N. Diagnostics
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 331/471 Part 2 - Specification
+No. Type Description
+Scenario description 1. The CSMS sends CustomerInformationRequest with the clear flag set to true to the Charging
+Station with a reference to a customer (idToken, customerCertificate or customerIdentifier).
+2. The Charging Station responds with CustomerInformationResponse, indicating whether it will
+send it or not.
+3. If the report flag is set to true, the Charging Station sends one or more
+NotifyCustomerInformationRequest messages to the CSMS.
+4. The CSMS responds with one or more NotifyCustomerInformationResponse messages to the
+Charging Station.
+5 Prerequisite(s) n/a
+6 Postcondition(s) The CSMS has Successfully received a CustomerInformationResponse message with status
+Accepted, the Charging Station has removed the customer information as requested and (if report
+flag was set to true) the CSMS has Successfully received the removed data.
+CSMS Charging Station
+CustomerInformationRequest(report, clear = true)
+CustomerInformationResponse()
+opt[if report = true]
+loop[for each report part]
+NotifyCustomerInformationRequest()
+NotifyCustomerInformationResponse()
+clear customer information
+Figure 141. Sequence Diagram: Clear Customer Information
+7 Error handling n/a
+8 Remark(s) n/a
+N10 - Clear Customer Information - Requirements
+Table 233. N10 - Requirements
+ID Precondition Requirement definition Note
+N10.FR.01 When the Charging Station receives a
+CustomerInformationRequest AND
+it is in a state where it can process
+this request.
+the Charging Station SHALL respond with a
+CustomerInformationResponse message with
+status Accepted .
+N10.FR.02 When the Customer referred to by the
+customer identifier is present in the
+Local Authorization List of a Charging
+Station
+The CSMS SHALL update the Local Authorization
+List using the SendLocalListRequest (see D01 -
+Send Local Authorization List).
+To prevent problems with
+Local Authorization List
+versions.
+N10.FR.03 N10.FR.01 AND
+receiving a
+CustomerInformationRequest with the
+clear flag set to true and the report
+flag set to true AND
+the Charging Station has information
+stored about the customer referred to
+by the customer identifier.
+The Charging Station SHALL remove all customer
+related data for the Customer referred to by the
+customer identifier from the Charging Station,
+except from the LocalList AND the Charging Station
+SHALL send the cleared information via one or
+more NotifyCustomerInformationRequest
+messages to the CSMS.
+To prevent problems with
+LocalList versions only
+the CSMS can change
+the contents of the
+LocalList.
+N10.FR.04 N10.FR.01 AND
+receiving a
+CustomerInformationRequest with the
+clear flag set to true and the report
+flag set to true AND
+the Charging Station has no
+information stored about the
+customer referred to by the customer
+identifier.
+The Charging Station SHALL send one
+NotifyCustomerInformationRequest message to
+the CSMS indicating that no data was found.
+Edition 2 FINAL, 2022-12-15 N. Diagnostics
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 332/471 Part 2 - Specification
+ID Precondition Requirement definition Note
+N10.FR.05 When the Charging Station receives a
+CustomerInformationRequest and is
+in a state where it cannot process this
+request.
+The Charging Station SHALL respond with a
+CustomerInformationResponse with status
+Rejected
+N10.FR.06 N10.FR.01 AND
+receiving a
+CustomerInformationRequest with the
+clear flag set to true, the report flag
+set to false
+The Charging Station SHALL remove all customer
+related data for the Customer referred to by the
+customer identifier from the Charging Station,
+except from the LocalList AND the Charging Station
+SHALL send one
+NotifyCustomerInformationRequest message to
+the CSMS indicating that the data was cleared.
+To prevent problems with
+LocalList versions only
+the CSMS can change
+the contents of the
+LocalList.
+N10.FR.07 When receiving a
+CustomerInformationRequest with
+both the report flag as well as the
+clear flag are set to false
+It is RECOMMENDED to respond with a
+CustomerInformationResponse message with
+status Rejected .
+N10.FR.08 The CSMS SHALL include a reference to a
+customer by including either an idToken,
+customerCertificate or customerIdentifier in the
+CustomerInformationRequest.
+N10.FR.09 When clearing user information
+according to the customerCertificate
+The CSMS SHALL use the hashAlgorithm, which
+was used to install the certificate.
+When a new firmware is
+installed it is
+RECOMMENDED that the
+CSMS requests the
+certificate first using
+GetInstalledCertificateIds
+Request to be sure of the
+used hashAlgorithm.
+Edition 2 FINAL, 2022-12-15 N. Diagnostics
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 333/471 Part 2 - Specification
+O. DisplayMessage
+Edition 2 FINAL, 2022-12-15 O. DisplayMessage
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 334/471 Part 2 - Specification

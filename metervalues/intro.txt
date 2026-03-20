@@ -1,0 +1,91 @@
+1. Introduction
+This Functional Block describes the functionality that enables a Charging Station to send periodic, possibly clock-aligned
+MeterValues.
+The transfer of the MeterValues from the Charging Station to the CSMS will be taken over by the new Device Management
+Monitoring feature, however this mechanism has not been proven in the field yet. So the old MeterValuesRequest message remains
+available for use for now.
+Extensive metering data relating to transactions can be recorded and transmitted in different ways depending on its intended
+purpose. There are two obvious use cases (but the use of meter values is not limited to these two):
+• Transaction Meter Values
+• Clock-Aligned Meter Values
+Both types of meter readings MAY be reported in the meterValue element of the TransactionEventRequest message. Clock-Aligned
+Meter Values MAY be reported in standalone MeterValuesRequest messages.
+Edition 2 FINAL, 2022-12-15 J. MeterValues
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 223/471 Part 2 - Specification
+2. Configuration
+This section is normative.
+2.1. Transaction Meter Values
+Frequent (e.g. 1-5 minute interval) meter readings taken and transmitted (usually in "real time") to the CSMS, to allow it to provide
+information updates to the EV user (who is usually not at the Charging Station), via web, app, SMS, etc., as to the progress of the
+transaction. In OCPP, this is called "sampled meter data", as the exact frequency and time of readings is not very significant, as long
+as it is "frequent enough". "Sampled meter data" can be configured with the following Configuration Variables:
+• SampledDataTxStartedMeasurands
+• SampledDataTxUpdatedMeasurands
+• SampledDataTxUpdatedInterval
+• SampledDataTxEndedMeasurands
+• SampledDataTxEndedInterval
+SampledDataTxUpdatedInterval is the time (in seconds) between sampling of metering (or other) data, intended to be
+transmitted by TransactionEventRequest (eventType = Updated) messages during a transaction. A value of "0" (numeric zero), by
+convention, is to be interpreted to mean that no sampled data should be transmitted.
+SampledDataTxEndedInterval is the time (in seconds) between sampling of metering (or other) data, intended to be
+transmitted in the TransactionEventRequest (eventType = Ended) message.
+SampledDataTxStartedMeasurands is a comma separated list that prescribes the set of measurands to be included in the
+meterValues field of a TransactionEventRequest (eventType = Started).
+SampledDataTxUpdatedMeasurands is a comma separated list that prescribes the set of measurands to be included in the
+meterValues field of a TransactionEventRequest (eventType = Updated), every SampledDataTxUpdatedInterval seconds.
+SampledDataTxEndedMeasurands is a comma separated list that prescribes the sampled measurands to be included in the
+meterValues field of a TransactionEventRequest (eventType = Ended), these measurands have to be taken every
+SampledDataTxEndedInterval seconds from the start of the transaction, and will only be sent in the TransactionEventRequest
+(eventType = Ended).
+Care should be taken to ensure that the amount of measurands that is expected at the end of a transaction fits in one
+TransactionEventRequest(eventType=Ended) message. Keep the number of measurands in SampledDataTxEndedMeasurands
+to a minimum and configure a large interval in SampledDataTxEndedInterval to keep the number of samples small.
+NOTE Please note: Transaction related MeterValues are never transmitted in MeterValuesRequest.
+2.2. Clock-Aligned Meter Values
+Grid Operator might require meter readings to be taken from fiscally certified energy meters, at specific Clock aligned times
+(usually every quarter hour, or half hour).
+"Clock-Aligned Meter Values" can be configured with the following Configuration Variables:
+• AlignedDataMeasurands
+• AlignedDataInterval
+• AlignedDataTxEndedMeasurands
+• AlignedDataTxEndedInterval
+• AlignedDataSendDuringIdle
+AlignedDataInterval is the size of the clock-aligned data interval (in seconds). This defines the set of evenly spaced meter
+data aggregation intervals per day, starting at 00:00:00 (midnight), at which time the Charging Station should take measurements
+and send them to the CSMS in a MeterValuesRequest message. A value of "0" (numeric zero), by convention, is to be interpreted to
+mean that no clock-aligned data should be transmitted.
+AlignedDataTxEndedInterval is the size of the clock-aligned data interval (in seconds). This defines the set of evenly spaced
+Edition 2 FINAL, 2022-12-15 J. MeterValues
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 224/471 Part 2 - Specification
+meter data aggregation intervals per day, starting at 00:00:00 (midnight) intended to be transmitted in the TransactionEventRequest
+(eventType = Ended) message.
+For example, a value of 900 (15 minutes) indicates that every day should be broken into 96 15-minute intervals, starting at 0:00 and
+then measured every 15 minutes: 0:15, 0:30, 0:45, 1:00, 1:15 etc.
+AlignedDataMeasurands is a comma separated list that prescribes the set of measurands to be included in a
+MeterValuesRequest PDU, every AlignedDataInterval seconds.
+AlignedDataTxEndedMeasurands is a comma separated list that prescribes the set of clock-aligned periodic measurands to be
+included in the meterValue elements of TransactionEventRequest (eventType = Ended) PDU for every
+AlignedDataTxEndedInterval of the transaction.
+AlignedDataSendDuringIdle can be used to only send clock aligned meter values when there are no ongoing transactions.
+2.3. Multiple Locations/Phases
+When a Charging Station can measure the same measurand on multiple locations or phases, all possible locations and/or phases
+SHALL be reported when configured in one of the relevant Configuration Variables.
+For example: A Charging Station capable of measuring Current.Import on Inlet (all 3 phases) (grid connection) and Outlet (3 phases
+per EVSE on both its EVSEs). Current.Import is set in AlignedDataMeasurands. AlignedDataInterval is set to 900
+(seconds). Then the Charging Station should send: (every 15 minutes)
+• a MeterValuesRequest with: evseId = 0; with 3 SampledValue elements, one per phase with location = Inlet.
+• a MeterValuesRequest with: evseId = 1; with 3 SampledValue elements, one per phase with location = Outlet.
+• a MeterValuesRequest with: evseId = 2; with 3 SampledValue elements, one per phase with location = Outlet.
+NOTE
+When the configuration variable SampledDataRegisterValuesWithoutPhases has the value true, then
+meter values of measurand Energy.Active.Import.Register will only report the total energy over all
+phases without reporting the individual phase values.
+2.4. Signed Meter Values
+OCPP 2.0.1 supports signed meter values. When a Charging Station support signed meter values it can use the Configuration
+Variables AlignedDataSignReadings and SampledDataSignReadings to report this. The CSMS can then use this same
+variables to turn the use of signed meter values on or off.
+When enabled the Charging Station shall put the signed meter value in the SignedMeterValue field of the SampledValue.
+Edition 2 FINAL, 2022-12-15 J. MeterValues
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 225/471 Part 2 - Specification
+3. Use cases & Requirements
+3.1. MeterValues

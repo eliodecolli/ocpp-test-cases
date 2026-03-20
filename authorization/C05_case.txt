@@ -1,0 +1,297 @@
+C05 - Authorization for CSMS Initiated Transactions
+Test Cases
+======================================================
+
+Protocol Summary:
+This protocol covers the scenario where a CSMS (Charging Station Management System) initiates
+a transaction on a Charging Station on behalf of an EV Driver who has no RFID card, or whose
+RFID is not known (e.g., the driver uses a mobile app). The CSMS generates or derives an
+IdToken of type "Central" and sends a RequestStartTransaction to the Charging Station.
+Because the IdToken type is Central, the Charging Station must NOT send an AuthorizeRequest
+and must NOT cache the token. The RemoteStartId and the idToken must both appear in the
+first TransactionEventRequest after the remote start.
+
+======================================================
+TEST CASE 1
+Title: Happy Path - App-initiated charge starts successfully
+
+Scenario:
+An EV Driver uses a mobile app to request a charge session. The CSMS generates a Central
+IdToken and sends a RequestStartTransactionRequest to the Charging Station. Everything
+proceeds normally.
+
+Steps:
+1. The EV Driver opens the app and requests to start charging at a specific Charging Station.
+2. The app sends a start request to the CSMS.
+3. The CSMS generates a unique IdToken (IdTokenType = Central) for this transaction.
+4. The CSMS sends a RequestStartTransactionRequest containing the Central IdToken to the
+   Charging Station.
+5. The Charging Station receives the request and responds with a
+   RequestStartTransactionResponse with status "Accepted".
+6. The Charging Station begins charging the vehicle.
+7. The Charging Station sends a TransactionEventRequest with eventType = "Updated" to
+   notify the CSMS that the chargingState has changed.
+
+Expected Result:
+- The Charging Station accepts the request and charging begins.
+- The Charging Station does NOT send an AuthorizeRequest to the CSMS for the Central IdToken.
+- The TransactionEventRequest includes the RemoteStartId provided in the original
+  RequestStartTransactionRequest.
+- The TransactionEventRequest includes the idToken used to start the transaction.
+- Charging proceeds normally and the CSMS is informed of the state change.
+
+======================================================
+TEST CASE 2
+Title: Happy Path - CSMS uses contract ID from app as IdToken
+
+Scenario:
+The EV Driver's app provides the user's contract ID. The CSMS uses this contract ID directly
+as the IdToken (type Central) instead of generating a random unique ID.
+
+Steps:
+1. The EV Driver opens the app and requests to start charging.
+2. The app sends the user's contract ID along with the start request to the CSMS.
+3. The CSMS uses the contract ID as the IdToken value with IdTokenType = Central.
+4. The CSMS sends a RequestStartTransactionRequest with this IdToken to the Charging Station.
+5. The Charging Station responds with RequestStartTransactionResponse status "Accepted".
+6. The Charging Station starts charging and sends a TransactionEventRequest
+   (eventType = "Updated").
+
+Expected Result:
+- The Charging Station accepts the request without sending an AuthorizeRequest.
+- The TransactionEventRequest includes the RemoteStartId and the contract-based idToken.
+- Charging starts successfully.
+
+======================================================
+TEST CASE 3
+Title: No AuthorizeRequest sent for Central IdToken
+
+Scenario:
+Verify that the Charging Station strictly does not attempt to authorize a Central IdToken
+by sending an AuthorizeRequest to the CSMS, as required by C05.FR.01.
+
+Steps:
+1. The CSMS sends a RequestStartTransactionRequest with an IdToken of type Central to the
+   Charging Station.
+2. Monitor all messages sent by the Charging Station after receiving this request.
+3. The Charging Station sends a RequestStartTransactionResponse with status "Accepted".
+4. The Charging Station sends a TransactionEventRequest indicating the transaction started.
+
+Expected Result:
+- The Charging Station sends no AuthorizeRequest at any point during this flow.
+- The only outbound messages from the Charging Station are the
+  RequestStartTransactionResponse and the TransactionEventRequest(s).
+
+======================================================
+TEST CASE 4
+Title: Central IdToken not stored in Authorization Cache
+
+Scenario:
+The Charging Station has an Authorization Cache enabled. Verify that a Central IdToken
+received in any message is never written to the cache, as required by C05.FR.02.
+
+Steps:
+1. Confirm that the Charging Station has Authorization Cache functionality enabled.
+2. The CSMS sends a RequestStartTransactionRequest with an IdToken of type Central.
+3. The Charging Station accepts and starts the transaction.
+4. Inspect the Authorization Cache of the Charging Station (via diagnostics, a cache query
+   message, or subsequent behavior).
+
+Expected Result:
+- The Central IdToken is not present in the Authorization Cache after the transaction starts.
+- If the same Central IdToken is used again in a future transaction, the Charging Station
+  does not serve it from cache; it treats it as a fresh CSMS-initiated request each time.
+
+======================================================
+TEST CASE 5
+Title: RemoteStartId present in TransactionEventRequest (C05.FR.03)
+
+Scenario:
+Verify that the RemoteStartId provided by the CSMS in the RequestStartTransactionRequest
+is included at least once in a subsequent TransactionEventRequest, as required by C05.FR.03.
+
+Steps:
+1. The CSMS sends a RequestStartTransactionRequest containing a specific RemoteStartId value
+   (e.g., "RST-0042") and a Central IdToken.
+2. The Charging Station responds with RequestStartTransactionResponse "Accepted".
+3. The Charging Station sends a TransactionEventRequest as the transaction progresses.
+4. Inspect the TransactionEventRequest for the presence of the RemoteStartId field.
+
+Expected Result:
+- The TransactionEventRequest contains the RemoteStartId "RST-0042" (or whatever value was
+  sent by the CSMS).
+- This field appears in at least the first TransactionEventRequest following the remote start.
+
+======================================================
+TEST CASE 6
+Title: idToken present in first TransactionEventRequest after remote start (C05.FR.05)
+
+Scenario:
+Verify that the idToken used in the RequestStartTransactionRequest is included in the first
+TransactionEventRequest sent after the transaction begins, as required by C05.FR.05.
+
+Steps:
+1. The CSMS sends a RequestStartTransactionRequest with a Central IdToken (e.g., value
+   "CENTRAL-TOKEN-XYZ").
+2. The Charging Station accepts and begins the transaction.
+3. The Charging Station sends the first TransactionEventRequest (eventType = "Updated" or
+   "Started").
+4. Inspect this first TransactionEventRequest for the idToken field.
+
+Expected Result:
+- The idToken "CENTRAL-TOKEN-XYZ" is present in the first TransactionEventRequest.
+- The idToken value and type match exactly what was provided in the
+  RequestStartTransactionRequest.
+
+======================================================
+TEST CASE 7
+Title: Language tag formatted correctly per RFC-5646 (C05.FR.04)
+
+Scenario:
+Verify that any language field included in messages related to this flow uses RFC-4646/5646
+formatted tags (e.g., "en-US" for US English), as required by C05.FR.04.
+
+Steps:
+1. The CSMS sends a RequestStartTransactionRequest that includes a language-tagged field
+   (e.g., a display message or personal message to the driver).
+2. Inspect the language tag value in the message.
+
+Expected Result:
+- The language tag follows RFC-5646 format (e.g., "en-US", "de-DE", "fr-FR").
+- Tags that are malformed (e.g., "english", "EN", "en_US" with underscore) are not accepted
+  and should result in a validation error or rejection.
+
+======================================================
+TEST CASE 8
+Title: Charging Station rejects the RequestStartTransactionRequest
+
+Scenario:
+The Charging Station is unable to accept the remote start request (e.g., the connector is
+occupied, faulted, or unavailable). The CSMS sends a RequestStartTransactionRequest but
+the Charging Station responds with a non-Accepted status.
+
+Steps:
+1. Put the Charging Station into a state where it cannot start a new transaction
+   (e.g., a connector is already in use or the station is in a faulted state).
+2. The CSMS sends a RequestStartTransactionRequest with a Central IdToken.
+3. The Charging Station responds with RequestStartTransactionResponse with a status other
+   than "Accepted" (e.g., "Rejected").
+
+Expected Result:
+- The Charging Station responds with "Rejected" (or appropriate non-Accepted status).
+- No AuthorizeRequest is sent by the Charging Station.
+- No charging session is started.
+- No TransactionEventRequest is sent for this attempted transaction.
+- The CSMS is responsible for informing the driver that the charge could not start.
+
+======================================================
+TEST CASE 9
+Title: RequestStartTransactionRequest sent to a specific connector
+
+Scenario:
+The CSMS specifies a particular EVSE or connector ID in the RequestStartTransactionRequest
+to direct the Charging Station to start charging on a specific connector.
+
+Steps:
+1. The CSMS sends a RequestStartTransactionRequest with a Central IdToken and includes the
+   evseId for a specific connector on the Charging Station.
+2. The Charging Station responds with RequestStartTransactionResponse "Accepted".
+3. The Charging Station starts charging on the specified connector.
+4. The Charging Station sends a TransactionEventRequest (eventType = "Updated") referencing
+   the correct EVSE/connector.
+
+Expected Result:
+- Charging begins on the connector identified by the evseId in the request.
+- The TransactionEventRequest references the correct evseId.
+- No AuthorizeRequest is sent.
+- RemoteStartId and idToken are present in the first TransactionEventRequest.
+
+======================================================
+TEST CASE 10
+Title: RequestStartTransactionRequest without specifying a connector
+
+Scenario:
+The CSMS sends a RequestStartTransactionRequest without specifying a particular evseId,
+leaving connector selection to the Charging Station.
+
+Steps:
+1. The CSMS sends a RequestStartTransactionRequest with a Central IdToken but without an
+   evseId field.
+2. The Charging Station selects an available connector and responds with
+   RequestStartTransactionResponse "Accepted".
+3. The Charging Station begins charging and sends a TransactionEventRequest.
+
+Expected Result:
+- The Charging Station selects an available connector autonomously.
+- Charging starts successfully on the chosen connector.
+- No AuthorizeRequest is sent.
+- The TransactionEventRequest includes the RemoteStartId and idToken.
+
+======================================================
+TEST CASE 11
+Title: Offline Charging Station receives RequestStartTransactionRequest
+
+Scenario:
+The Charging Station is temporarily offline (cannot communicate with CSMS). The CSMS
+attempts to send a RequestStartTransactionRequest but the message cannot be delivered.
+
+Steps:
+1. Simulate the Charging Station going offline (network disconnected).
+2. Attempt to send a RequestStartTransactionRequest from the CSMS.
+3. Wait for a timeout or failure indication on the CSMS side.
+4. Restore the Charging Station's connectivity.
+
+Expected Result:
+- The CSMS does not receive a RequestStartTransactionResponse.
+- The CSMS handles the timeout gracefully and may retry or inform the driver that the
+  station is unreachable.
+- No unauthorized charging session is started on the Charging Station.
+- Once connectivity is restored, the Charging Station does not process a stale request
+  (or handles it according to the configured timeout behavior).
+
+======================================================
+TEST CASE 12
+Title: Duplicate RemoteStartId used in a second RequestStartTransactionRequest
+
+Scenario:
+The CSMS accidentally sends a second RequestStartTransactionRequest using the same
+RemoteStartId as a previously accepted and active transaction.
+
+Steps:
+1. The CSMS sends a RequestStartTransactionRequest with RemoteStartId = "RST-0100" and a
+   Central IdToken. The Charging Station accepts and starts charging.
+2. While the first transaction is still active, the CSMS sends another
+   RequestStartTransactionRequest with the same RemoteStartId = "RST-0100" and a new
+   Central IdToken.
+3. Observe the Charging Station's response.
+
+Expected Result:
+- The Charging Station rejects or handles the duplicate appropriately (e.g., responds with
+  "Rejected" if no additional connector is available, or starts a second session on a
+  different connector if one is free).
+- The active transaction is not disrupted.
+- The behavior is deterministic and clearly communicated back to the CSMS.
+
+======================================================
+TEST CASE 13
+Title: Central IdToken not cached even when IdTokenInfo is received in a different message
+
+Scenario:
+Verify the cache exclusion rule applies not only during RequestStartTransactionRequest
+processing but also when a Central IdToken's IdTokenInfo is received in any other message
+context (e.g., an AuthorizeResponse or other informational message), per C05.FR.02.
+
+Steps:
+1. Trigger a flow where the CSMS sends IdTokenInfo for a Central IdToken as part of any
+   message response (not necessarily a RequestStartTransactionRequest).
+2. Inspect the Charging Station's Authorization Cache immediately after receipt of the
+   message.
+
+Expected Result:
+- The Authorization Cache does not contain any entry for the Central IdToken, regardless
+  of which message carried the IdTokenInfo.
+- Future use of the same Central IdToken goes through the normal CSMS-initiated flow and
+  is not served from cache.
+
+======================================================
+END OF TEST CASES

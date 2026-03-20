@@ -1,0 +1,8 @@
+1. Introduction
+This Functional Block describes the diagnostics functionality of OCPP. This functionality enables remote diagnostics of problems
+with a Charging Station. A Charging Station can be requested to upload a file with diagnostics information (optionally limited to a
+specified interval).
+Edition 2 FINAL, 2022-12-15 N. Diagnostics
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 315/471 Part 2 - Specification
+2. Use cases & Requirements
+2.1. Logging

@@ -1,0 +1,91 @@
+B04 - Offline Behavior Idle Charging Station - Test Cases
+
+GOAL: Ensure the Charging Station can operate stand-alone when communication with the CSMS is unavailable, and that it correctly reports connector states upon reconnection.
+
+================================================================================
+
+TEST CASE 1: Normal offline period — connection lost and restored
+Scenario: The Charging Station loses connection to the CSMS and later reconnects.
+Steps:
+  1. Charging Station is operating normally with an accepted BootNotification.
+  2. Communication to the CSMS is lost.
+  3. Charging Station operates stand-alone (offline mode).
+  4. Connection is restored.
+  5. Charging Station reports connector statuses.
+  6. Charging Station resumes Heartbeats.
+Expected result:
+  - Charging Station operates without CSMS during the outage.
+  - Upon reconnection, CSMS receives updated connector state information.
+  - Heartbeats resume normally.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 2: Offline period exceeds OfflineThreshold — report ALL connectors
+Scenario: The Charging Station was offline longer than the OfflineThreshold configuration variable.
+Steps:
+  1. Charging Station goes offline.
+  2. Time passes; offline duration exceeds OfflineThreshold.
+  3. Connection is restored.
+Expected result:
+  - Charging Station sends StatusNotificationRequest for ALL connectors, reporting their current status.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 3: Offline period does NOT exceed OfflineThreshold — report only changed connectors
+Scenario: The Charging Station was offline for a short period within the OfflineThreshold.
+Steps:
+  1. Charging Station goes offline.
+  2. Time passes; offline duration is LESS than OfflineThreshold.
+  3. One or more connectors changed status during the offline period; others did not.
+  4. Connection is restored.
+Expected result:
+  - Charging Station sends StatusNotificationRequest ONLY for connectors whose status changed during the offline period.
+  - Connectors with unchanged status do NOT generate a StatusNotification.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 4: Offline period does NOT exceed OfflineThreshold — no status changes
+Scenario: Short offline period with no connector status changes at all.
+Steps:
+  1. Charging Station goes offline briefly (within OfflineThreshold).
+  2. No connector changes state during the offline period.
+  3. Connection is restored.
+Expected result:
+  - Charging Station sends no StatusNotificationRequests (no changes to report).
+  - Heartbeats resume.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 5: Charging Station continues stand-alone operation during outage
+Scenario: Verify the station continues to function without the CSMS.
+Steps:
+  1. CSMS or network becomes unavailable.
+  2. Charging Station continues stand-alone operation.
+Expected result:
+  - Charging Station does not halt operation; it remains functional in offline mode.
+  - The station attempts to re-establish the connection.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 6: Heartbeats resume after reconnection
+Scenario: After reconnection, the station resumes sending Heartbeats.
+Steps:
+  1. Charging Station reconnects after an offline period.
+  2. Charging Station sends StatusNotification(s) as appropriate.
+  3. Charging Station sends HeartbeatRequest.
+  4. CSMS responds with HeartbeatResponse.
+Expected result:
+  - Heartbeat cycle resumes normally after reconnection.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 7: Connection error — station retries reconnection
+Scenario: The connection is not restored automatically; the station keeps trying.
+Steps:
+  1. Communication is lost.
+  2. Charging Station attempts to reconnect repeatedly.
+Expected result:
+  - Charging Station retries connection attempts.
+  - Retries are spaced to avoid flooding the CSMS.
+
+--------------------------------------------------------------------------------

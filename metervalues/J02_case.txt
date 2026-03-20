@@ -1,0 +1,270 @@
+J02 - Sending transaction related Meter Values
+Test Cases
+================================================================================
+
+TC-J02-001
+Title: Charging Station may sample meter and send Meter Values during a transaction
+Requirement: J02.FR.01
+Steps:
+  1. Ensure the Charging Station has a transaction running.
+  2. Configure the Charging Station via SetVariablesRequest to set a data acquisition interval and specify measurands to report.
+  3. Wait for the configured interval to elapse.
+  4. Observe messages sent by the Charging Station to the CSMS.
+Expected Result:
+  The Charging Station sends a TransactionEventRequest with eventType = Updated containing meterValues to the CSMS.
+  The message is sent at or near the configured interval.
+  The presence of this message confirms the Charging Station exercised its right to sample the meter.
+
+--------------------------------------------------------------------------------
+
+TC-J02-002
+Title: Each MeterValue element contains one or more SampledValue elements captured at the same point in time
+Requirement: J02.FR.02
+Steps:
+  1. Ensure a transaction is running and the Charging Station is configured to send meter values.
+  2. Wait for the Charging Station to send a TransactionEventRequest (eventType = Updated) with meterValues.
+  3. Inspect each MeterValue element within the meterValues field of the received message.
+Expected Result:
+  Every MeterValue element in the meterValues array contains at least one SampledValue element.
+  All SampledValue elements within a single MeterValue element share the same timestamp, confirming they were captured at the same point in time.
+
+--------------------------------------------------------------------------------
+
+TC-J02-003
+Title: Measurand field specifies the type of value being measured
+Requirement: J02.FR.03
+Steps:
+  1. Ensure a transaction is running and the Charging Station is configured to report measurands (e.g., Energy.Active.Import.Register, Power.Active.Import).
+  2. Wait for the Charging Station to send a TransactionEventRequest (eventType = Updated).
+  3. Inspect the SampledValue elements within the meterValues field.
+Expected Result:
+  Each SampledValue element that carries a measurand type has its measurand field populated with a valid MeasurandEnumType value (e.g., "Energy.Active.Import.Register").
+  The measurand field correctly identifies the type of value being reported in the value field of that SampledValue.
+
+--------------------------------------------------------------------------------
+
+TC-J02-004
+Title: Context field specifies the reason or event triggering the reading
+Requirement: J02.FR.04
+Steps:
+  1. Ensure a transaction is running and the Charging Station is configured to send meter values periodically.
+  2. Wait for the Charging Station to send a TransactionEventRequest (eventType = Updated, triggerReason = MeterValuePeriodic).
+  3. Inspect the SampledValue elements within the meterValues field.
+Expected Result:
+  Each SampledValue element that includes a context field has it set to an appropriate ReadingContextEnumType value (e.g., "Sample.Periodic" for periodic readings).
+  The context field value matches the trigger event that caused the reading.
+
+--------------------------------------------------------------------------------
+
+TC-J02-005
+Title: Location field specifies where the measurement is taken
+Requirement: J02.FR.05
+Steps:
+  1. Ensure a transaction is running and the Charging Station is configured to send meter values with location information.
+  2. Wait for the Charging Station to send a TransactionEventRequest (eventType = Updated).
+  3. Inspect the SampledValue elements within the meterValues field.
+Expected Result:
+  Any SampledValue element that includes the location field has it set to a valid LocationEnumType value (e.g., "Inlet" or "Outlet").
+  The location field correctly reflects the physical measurement point for that sampled value.
+
+--------------------------------------------------------------------------------
+
+TC-J02-006
+Title: Phase field specifies to which phase(s) the sampled value applies
+Requirement: J02.FR.06
+Steps:
+  1. Ensure a transaction is running on a multi-phase Charging Station configured to report per-phase values.
+  2. Wait for the Charging Station to send a TransactionEventRequest (eventType = Updated).
+  3. Inspect the SampledValue elements within the meterValues field.
+Expected Result:
+  Each SampledValue element that pertains to a specific phase has its phase field set to the corresponding PhaseEnumType value (e.g., "L1", "L2", "L3", "L1-N", etc.).
+  The phase field is absent or null for measurands where phase is not applicable.
+
+--------------------------------------------------------------------------------
+
+TC-J02-007
+Title: Phase-dependent values are reported from the power meter (or grid connection) point of view
+Requirement: J02.FR.07
+Steps:
+  1. Ensure a transaction is running on a Charging Station with a known phase configuration at the meter point.
+  2. Wait for the Charging Station to send a TransactionEventRequest (eventType = Updated) containing phase-specific SampledValues.
+  3. Inspect the phase field values for each phase-dependent SampledValue.
+Expected Result:
+  All phase number references in SampledValue elements reflect the numbering as seen from the power meter (or the grid connection point if no meter is present), not from the EV connector side.
+  The reported phase numbers are consistent with the metering hardware's perspective.
+
+--------------------------------------------------------------------------------
+
+TC-J02-008
+Title: Phase rotation is reported relative to the grid connection
+Requirement: J02.FR.09
+Steps:
+  1. Ensure a transaction is running on a Charging Station with a non-trivial phase rotation configuration.
+  2. Query the PhaseRotation Configuration Variables for each component in the chain from grid connection up to the Connector.
+  3. Wait for or trigger the Charging Station to report a phase rotation value in a TransactionEventRequest.
+  4. Compare the reported phase rotation against the known grid connection reference.
+Expected Result:
+  The phase rotation value reported by the Charging Station in the SampledValue (or via the PhaseRotation variable) is expressed relative to the grid connection point.
+  It is not expressed relative to the EV or the connector in isolation.
+
+--------------------------------------------------------------------------------
+
+TC-J02-009
+Title: All meter value measurements in a single TransactionEventRequest share the same timestamp
+Requirement: J02.FR.10
+Steps:
+  1. Ensure a transaction is running and the Charging Station is configured to send meter values.
+  2. Wait for the Charging Station to send a TransactionEventRequest (eventType = Updated) containing multiple MeterValue elements.
+  3. Inspect the timestamp field of each MeterValue element in the meterValues array.
+Expected Result:
+  All MeterValue elements within a single TransactionEventRequest message carry the same timestamp value.
+  Meter values that belong to a different timestamp are NOT included in this message; they are sent in a separate TransactionEventRequest.
+
+--------------------------------------------------------------------------------
+
+TC-J02-010
+Title: Charging Station sends periodic meter values with triggerReason = MeterValuePeriodic when SampledDataTxUpdatedInterval elapses
+Requirement: J02.FR.11
+Steps:
+  1. Configure the Charging Station via SetVariablesRequest to send meter data in TransactionEventRequest (eventType = Updated) and set SampledDataTxUpdatedInterval to a specific value (e.g., 60 seconds) with specific measurands.
+  2. Start a transaction on the Charging Station.
+  3. Wait for the SampledDataTxUpdatedInterval to elapse.
+  4. Observe the next message sent by the Charging Station to the CSMS.
+Expected Result:
+  The Charging Station sends a TransactionEventRequest with:
+    - eventType = "Updated"
+    - triggerReason = "MeterValuePeriodic"
+    - meterValues field populated with the configured measurands
+  The message is sent at or near the configured interval expiry.
+
+--------------------------------------------------------------------------------
+
+TC-J02-011
+Title: Charging Station may drop periodic Updated messages when offline and low on memory
+Requirement: J02.FR.12
+Steps:
+  1. Configure the Charging Station to send periodic meter values (J02.FR.11 conditions met).
+  2. Disconnect the Charging Station from the CSMS (simulate offline state).
+  3. Allow the Charging Station to queue multiple TransactionEventRequest (eventType = Updated) messages.
+  4. Simulate a low-memory condition on the Charging Station.
+  5. Observe the queue contents or reconnect and observe which messages are delivered.
+Expected Result:
+  While offline and under low memory, the Charging Station is permitted (but not required) to drop one or more queued TransactionEventRequest (eventType = Updated) messages rather than buffering all of them.
+  The Charging Station does not crash or permanently stop queueing messages.
+
+--------------------------------------------------------------------------------
+
+TC-J02-012
+Title: When dropping queued Updated messages, intermediate messages are dropped first
+Requirement: J02.FR.13
+Steps:
+  1. Configure the Charging Station to send periodic meter values (J02.FR.11 conditions met).
+  2. Disconnect the Charging Station from the CSMS (simulate offline state) and allow low memory to occur.
+  3. Allow the Charging Station to queue at least five TransactionEventRequest (eventType = Updated) messages (labeled 1 through 5 in order of creation).
+  4. Trigger the drop behavior due to low memory.
+  5. Reconnect the Charging Station and observe which queued messages are delivered to the CSMS.
+Expected Result:
+  The Charging Station drops intermediate (odd-positioned: 1st, 3rd, 5th, ...) messages from the queue first.
+  The Charging Station does NOT simply discard all messages from the beginning of the queue, nor does it stop adding new messages to the queue entirely.
+  At minimum, the most recent (end-of-queue) messages are preserved and delivered on reconnection.
+
+--------------------------------------------------------------------------------
+
+TC-J02-013
+Title: Charging Station may use multiple TransactionEventRequest messages with the same timestamp when meter data is too large
+Requirement: J02.FR.14
+Steps:
+  1. Configure the Charging Station with a large number of measurands such that all of them cannot fit in a single TransactionEventRequest (eventType = Updated) message.
+  2. Start a transaction and wait for the SampledDataTxUpdatedInterval to elapse.
+  3. Observe the messages sent by the Charging Station to the CSMS.
+Expected Result:
+  The Charging Station sends more than one TransactionEventRequest (eventType = Updated) message.
+  All of these messages carry the same timestamp in their meterValues elements.
+  Together, the meterValues across all messages contain the full set of configured measurands.
+
+--------------------------------------------------------------------------------
+
+TC-J02-014
+Title: Register values relating to a single transaction are monotonically increasing over time
+Requirement: J02.FR.16
+Steps:
+  1. Ensure a transaction is running and the Charging Station is configured to report ".Register" measurands (e.g., Energy.Active.Import.Register).
+  2. Collect multiple TransactionEventRequest (eventType = Updated) messages over the course of the transaction.
+  3. Extract the value of the Register measurand from each successive message, ordered by timestamp.
+Expected Result:
+  The Register value in each successive TransactionEventRequest is greater than or equal to the Register value in the preceding message.
+  No decrease in Register value is observed during the transaction (except in a documented meter replacement scenario).
+
+--------------------------------------------------------------------------------
+
+TC-J02-015
+Title: Register values are reported as-read from hardware and not re-based to zero at transaction start
+Requirement: J02.FR.17
+Steps:
+  1. Record the Register value (e.g., Energy.Active.Import.Register) reported at the start of a new transaction (TransactionEventRequest with eventType = Started).
+  2. Record the Register value reported at the end of the immediately preceding transaction on the same connector (TransactionEventRequest with eventType = Ended).
+  3. Compare the two values.
+Expected Result:
+  The Register value at the start of the new transaction equals or is very close to the Register value at the end of the preceding transaction on the same connector.
+  The Charging Station does NOT reset the Register value to zero at the start of a transaction.
+  This enables the CSMS to detect any energy discrepancy between sequential transactions.
+
+--------------------------------------------------------------------------------
+
+TC-J02-016
+Title: Timestamp of a MeterValue applies to all its SampledValues
+Requirement: J02.FR.18
+Steps:
+  1. Ensure a transaction is running and the Charging Station is configured to send meter values.
+  2. Wait for the Charging Station to send a TransactionEventRequest (eventType = Updated) containing at least one MeterValue with multiple SampledValues.
+  3. Inspect the single timestamp of the MeterValue element and each SampledValue within it.
+Expected Result:
+  There is one timestamp on the MeterValue element.
+  All SampledValue elements within that MeterValue element are considered to have been captured at that single timestamp.
+  No individual SampledValue element carries a separate overriding timestamp that differs from the MeterValue-level timestamp.
+
+--------------------------------------------------------------------------------
+
+TC-J02-017
+Title: CSMS responds with TransactionEventResponse upon receiving a TransactionEventRequest
+Requirement: J02.FR.19
+Steps:
+  1. Ensure a transaction is running on the Charging Station.
+  2. Wait for or trigger the Charging Station to send a TransactionEventRequest (eventType = Updated) with meterValues to the CSMS.
+  3. Observe the CSMS response.
+Expected Result:
+  The CSMS sends a TransactionEventResponse message back to the Charging Station.
+  The response is sent for every TransactionEventRequest received, regardless of the meterValues content.
+  The Charging Station does not retransmit the same TransactionEventRequest after receiving the TransactionEventResponse.
+
+--------------------------------------------------------------------------------
+
+TC-J02-018
+Title: When too much meter data for a single Ended event, intermediate samples are removed first
+Requirement: J02.FR.20
+Steps:
+  1. Configure the Charging Station to send meter data in TransactionEventRequest (eventType = Ended) with a large number of samples captured during a long transaction.
+  2. End the transaction such that the total meter data exceeds what can fit in a single TransactionEventRequest (eventType = Ended) message.
+  3. Observe the TransactionEventRequest (eventType = Ended) message sent by the Charging Station.
+Expected Result:
+  The Charging Station fits the meter data into a single TransactionEventRequest (eventType = Ended) message.
+  If samples had to be removed, the intermediate samples (e.g., 2nd, 4th, 6th, etc.) are removed first, preserving the first and last samples.
+  The first and last samples are retained so that billing-relevant start and end values are not lost.
+
+--------------------------------------------------------------------------------
+
+TC-J02-019
+Title: Charging Station retrieves and reports signed meter values when SampledDataSignReadings is true
+Requirement: J02.FR.21
+Steps:
+  1. Configure the Charging Station by setting SampledDataSignReadings to true via SetVariablesRequest.
+  2. Ensure the Charging Station is connected to a metering component that supports data signing.
+  3. Start a transaction and wait for the Charging Station to send a TransactionEventRequest (eventType = Updated) with meterValues.
+  4. Inspect the SampledValue elements within the meterValues field.
+Expected Result:
+  Each SampledValue element for which the underlying component supports data signing has its signedMeterValue field populated with digitally signed binary meter value data.
+  No SampledValue from a signing-capable component has an empty or absent signedMeterValue field when SampledDataSignReadings is true.
+
+================================================================================
+END OF TEST CASES
+================================================================================

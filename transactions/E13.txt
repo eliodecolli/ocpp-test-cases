@@ -1,0 +1,152 @@
+E13 - Transaction-related
+message not accepted by CSMS.
+1.3.2. Sequence numbers
+When delivery of TransactionEventRequest messages fails and will be retried later, the result is that TransactionEventRequest
+messages may arrive in the CSMS in a different order from the one in which the transaction events occurred at the Charging
+Station. This in turn would make it difficult for the CSMS to know if it received all TransactionEventRequest messages about a
+transaction, which the CSMS may want to know before it starts billing the transaction.
+In order to make it possible to know that all TransactionEventRequest messages about a transaction were received, OCPP uses
+sequence numbers in TransactionEventRequest messages. For every EVSE, the Charging Station maintains a counter of the number
+of TransactionEventRequest messages generated about that EVSE. When generating a new TransactionEventRequest message,
+the Charging Station includes the current value of the EVSE’s counter in the seqNo field of the request, and then increments the
+counter. With this mechanism, a CSMS can check if it has full information about a transaction by checking that:
+• It received a TransactionEventRequest about the start of the transaction, with a seqNo a
+• It received a TransactionEventRequest about the stop of the transaction, with a seqNo o greater than a.
+• It received a TransactionEventRequest about the transaction with seqNo n for every integer n between a and o
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 117/471 Part 2 - Specification
+1.3.2.1. Sequence number generation
+This section is normative.
+When a transaction starts, the Charging Station SHOULD set the seqNo field for the TransactionEventRequest message to 0.
+(Implementations with a continuously increasing seqNo are still allowed.)
+After each TransactionEventRequest Charging Station SHALL increase the seqNo by 1.
+1.4. Authorization
+To simplify the use cases in this functional block, the way an EV Driver is authorized is not part of these use cases. It will simply be
+called something like: "User authorization successful" or "The EV Driver is authorized by the Charging Station and/or CSMS.". This
+may be any way of authorizing an EV Driver. See functional block: C Authorization for all the options and requirements for
+authorization.
+1.5. Clarification for optional fields in TransactionEventRequest
+This section is informative.
+The TransactionEventRequest contains several optional fields. Some of these fields should only be sent once and should not be
+repeated in every TransactionEventRequest. The following summary points to the requirements related to these optional fields.
+evse
+(E01.FR.16) The field evse is only provided in the first TransactionEventRequest that occurs after the EV has connected. It is
+not repeated in all future TransactionEventRequests.
+idToken
+(E03.FR.01) The field idToken is provided once in the first TransactionEventRequest that occurs after the transaction has
+been authorized.
+(E07.FR.02) The field idToken is provided once in the TransactionEventRequest that occurs when the authorization of the
+transaction has been ended.
+(C12.FR.02) The above is also the case when authorization was granted because the idToken is present in the authorization
+cache with a Accepted status.
+(F02.FR.05): The above is also the case when the idToken is provided by a RequestStartTransactionRequest.
+reservationId
+(E03.FR.03/H01.FR.15) The field reservationId is only provided in the first TransactionEventRequest that occurs when the
+transaction has been authorized by the idToken for which a reservation existed in the charging station.
+(F02.FR.06) The above is also the case when the idToken is provided by a RequestStartTransactionRequest.
+meterValue
+(E02.FR.09) The TransactionEventRequest(eventType=Started) must contain the meter values that have been configured
+in SampledDataCtrlr.TxStartedMeasurands.
+(E02.FR.10) A TransactionEventRequest(eventType=Updated) must be sent at every interval configured in
+SampledDataCtrlr.TxUpdatedInterval and contain the meter values that have been configured in
+SampledDataCtrlr.TxUpdatedMeasurands. If TxUpdatedMeasurands == 0, then no meter values are sent.
+(E06.FR.11) The TransactionEventRequest(eventType=Ended) must contain the meter values that have been configured in
+SampledDataCtrlr.TxEndedMeasurands. If SampledDataCtrlr.TxEndedInterval == 0, then only the values taken at start and
+end of the transaction are included.
+transactionInfo.chargingState
+(E02.FR.13) Whenever the charging state changes, the Charging Station must send a TransactionEventRequest containing
+chargingState.
+A TransactionEventRequest with triggerReason = ChargingStateChanged must contain chargingState.
+transactionInfo.stoppedReason
+(C15.FR.04, E05.FR.10, E05.FR.08/09, E07.FR.06) The stoppedReason must be provided in the
+TransactionEventRequest(eventType=Ended), unless the value is Local, in which case it may be omitted.
+(F03.FR.03, F03.FR.10, F04.FR.03) The above also applies to transactions that are stopped by a
+RequestStopTransactionRequest, however in this case the stoppedReason value must be Remote.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 118/471 Part 2 - Specification
+transactionInfo.remoteStartId
+(C05.FR.03, F01.FR.25, F02.FR.01) The remoteStartId must be sent in the next TransactionEventRequest after the
+RequestStartTransactionRequest with the same remoteStartId.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 119/471 Part 2 - Specification
+2. Use cases & Requirements
+2.1. OCPP transaction mechanism
+E13 - Transaction-related message not accepted by CSMS
+Table 120. E13 - Transaction-related message not accepted by CSMS
+No. Type Description
+1 Name Transaction-related message not accepted by CSMS
+2 ID E13
+Functional block E. Transactions
+3 Objective(s) To define how a Charging Station shall handle not accepted messages.
+4 Description There are a situation/issues why a CSMS might not accept a transaction related message, or
+does not reply within the MessageTimeout. Most are error scenarios. When something like this
+happens, the Charging Station SHALL retry the messages a couple of times.
+Actors Charging Station, CSMS
+Scenario description 1. The Charging Station sends a transaction-related message to the CSMS.
+2. The message is not accepted and MessageAttemptsTransactionEvent not reached.
+3. The Charging Station waits the number of preceding transmissions of this same message
+times MessageAttemptIntervalTransactionEvent seconds.
+4. The Charging Station resends the transaction-related message to the CSMS.
+5 Prerequisite(s) n/a
+6 Postcondition(s) Successful postcondition:
+MessageAttemptsTransactionEvent is not reached AND the transaction-related message is
+accepted. MessageAttemptsTransactionEvent is reached AND the transaction-related message is
+disposed. 
+Failure postcondition:
+MessageAttemptsTransactionEvent is not reached AND the transaction-related message is
+disposed. MessageAttemptsTransactionEvent is reached AND the transaction-related message is
+accepted.
+Charging StationCSMS
+transaction related message request()
+loop[while number of messages sent has not reached MessageAttemptsTransactionEvent]
+alt[if message delivered successfully]
+transaction related message response()
+Continue processing next message()
+[if message not accepted]
+failure to process the message()
+wait number of attempts x
+MessageAttemptIntervalTransactionEvent seconds
+resend message()
+dispose message()
+Figure 63. Sequence Diagram: Transaction-related message not accepted by CSMS
+7 Error handling n/a
+8 Remark(s) This use case describes the expect behaviour when the CSMS does not accept a message, or
+does not reply within the message timeout, this is different from a situation where the
+communication between Charging Station and CSMS is Offline.
+E13 - Transaction-related message not accepted by CSMS - Requirements
+Table 121. E13 - Requirements
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 164/471 Part 2 - Specification
+ID Precondition Requirement definition
+E13.FR.01 The number of times and the interval with which the Charging
+Station should retry such failed transaction-related messages
+MAY be configured using the
+MessageAttemptsTransactionEvent and
+MessageAttemptIntervalTransactionEvent
+Configuration Variables.
+E13.FR.02 When the Charging Station encounters a first
+failure to deliver a certain transaction-related
+message.
+The Charging Station SHALL send this message again as long as
+it keeps resulting in a failure to process this message and it has
+not yet encountered as many failures to process this message
+for this message as specified in its
+MessageAttemptsTransactionEvent Configuration
+Variable.
+E13.FR.03 The CSMS does not accept a transaction-related
+message.
+The Charging Station SHALL wait as many seconds as specified
+in its MessageAttemptIntervalTransactionEvent key,
+multiplied by the number of preceding transmissions of this
+same message.
+E13.FR.04 If the final attempt fails. The Charging Station SHALL discard the message and continue
+with the next transaction-related message, if there is any.
+E13 - Transaction-related message not accepted by CSMS - Example
+As an example, consider a Charging Station that has the value "3" for the MessageAttemptsTransactionEvent Configuration
+Variable and the value "60" for the MessageAttemptIntervalTransactionEvent Configuration Variable. It sends a
+TransactionEventRequest message and detects a failure to process the message in the CSMS. The Charging Station SHALL wait
+for 60 seconds, and resend the message. In the case when there is a second failure, the Charging Station SHALL wait for 120
+seconds, before resending the message. If this final attempt fails, the Charging Station SHALL discard the message and continue
+with the next transaction-related message, if there is any.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 165/471 Part 2 - Specification

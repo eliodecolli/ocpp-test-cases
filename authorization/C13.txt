@@ -1,0 +1,71 @@
+C13 - Offline Authorization through Local Authorization List and
+C13 -
+Offline Authorization through Local Authorization List.
+C07.FR.11 C07.FR.09 AND
+eMAID found in Authorization Cache
+The Charging Station SHALL behave according to use case C13 - Offline Authorization through Local Authorization List
+Table 83. C13 - Offline Authorization through Local Authorization List
+No. Type Description
+1 Name Offline Authorization through Local Authorization List
+2 ID C13
+Functional block C. Authorization
+3 Objective(s) To authorize an idToken by using the Local Authorization List while Offline.
+4 Description This use case describes how to authorize an IdToken, when communication with the CSMS is not
+possible.
+The Local Authorization List is a list of idTokens that can be synchronized with the CSMS. The list
+contains the authorization status of a selected set of idTokens as managed by the CSMS.
+Actors EV Driver, Charging Station
+Scenario description 1. The Charging Station is Offline
+2. The EV Driver presents IdToken.
+3. The Charging Station checks if the IdToken is known and has status Accepted in the Local
+Authorization List.
+4. The Charging Station start charging.
+5 Prerequisite(s) Local Authorization List is available
+Local Authorization List is enabled via LocalAuthListEnabled
+Charging Station is Offline
+The Id of the EV Driver is in the Local Authorization List
+Id is valid
+6 Postcondition(s) Successful postcondition:
+The Charging Station accepts tokens on the Local Authorization List when it is offline.
+Failure postcondition:
+The Charging Station does not accept tokens on the Local Authorization List when it is offline.
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 101/471 Part 2 - Specification
+EV DriverCharging Station
+connection loss
+Present IdToken
+check local authorization list()
+[cached tariff: 0.23/kWh]
+opt
+notification
+[tariff: 0.23/kWh]
+lock connector
+start energy offer
+Figure 34. Sequence Diagram: Offline Authorization through Local Authorization List
+7 Error handling n/a
+8 Remark(s) n/a
+C13 - Offline Authorization through Local Authorization List - Requirements
+Table 84. C13 - Requirements
+ID Precondition Requirement definition Note
+C13.FR.01 Where both Authorization Cache and Local
+Authorization List are supported, a Charging Station
+SHALL treat Local Authorization List entries as
+having priority over Authorization Cache entries for
+the same identifiers.
+C13.FR.02 If configuration variable
+OfflineTxForUnknownIdEnabled
+is false AND
+The Charging Station is offline.
+Only identifiers that are present in a Local
+Authorization List that have a status Accepted
+SHALL be allowed to authorize a transaction.
+C13.FR.03 The Charging Station MAY authorize the IdToken
+locally without involving the CSMS.
+As described in Local
+Authorization List.
+C13.FR.04 If configuration variable
+OfflineTxForUnknownIdEnabled
+is true AND
+The Charging Station is offline.
+Any identifier SHALL be allowed to authorize a
+transaction.

@@ -1,0 +1,396 @@
+C16 - Stop Transaction with a Master Pass
+Test Cases
+==========================================================================
+
+OVERVIEW
+--------
+This protocol (OCPP 2.0.1, C16) allows a privileged user — such as a Law Enforcement
+official — holding a "Master Pass" IdToken to stop one or more ongoing charging
+transactions at a Charging Station. The Master Pass is identified by its GroupId
+matching the station's configured MasterPassGroupId. The station's behavior differs
+depending on whether or not it has a user interface (UI).
+
+==========================================================================
+HAPPY PATH TEST CASES
+==========================================================================
+
+TC-C16-01: Master Pass stops a selected transaction on a station with a UI
+---------------------------------------------------------------------------
+Scenario:
+  A single EV is actively charging. A Law Enforcement official with a valid Master Pass
+  presents their IdToken at a Charging Station that has a display/UI. They select the
+  active transaction and stop it.
+
+Steps:
+  1. Ensure at least one transaction is actively ongoing at the Charging Station.
+  2. The user presents a Master Pass IdToken at the Charging Station.
+  3. The Charging Station sends an AuthorizeRequest to the CSMS.
+  4. The CSMS responds with an AuthorizeResponse where:
+       - idToken status is valid (Accepted).
+       - The GroupId in the response equals MasterPassGroupId.
+  5. The Charging Station detects the Master Pass GroupId and displays the Master Pass UI.
+  6. The user views the list of active transactions shown on the UI.
+  7. The user selects the single active transaction to stop.
+  8. The Charging Station stops the selected transaction and unlocks the cable.
+  9. The Charging Station sends a TransactionEventRequest (eventType = Ended,
+     stopReason = MasterPass) to the CSMS for the stopped transaction.
+  10. The CSMS responds with a TransactionEventResponse.
+
+Expected Result:
+  - The Master Pass UI is shown after authorization.
+  - The selected transaction is stopped and the cable is unlocked.
+  - A TransactionEventRequest with eventType = Ended and stopReason = MasterPass is
+    sent to the CSMS for the stopped transaction.
+  - The CSMS acknowledges with a TransactionEventResponse.
+  - Transactions NOT selected by the user continue uninterrupted.
+
+--------------------------------------------------------------------------
+
+TC-C16-02: Master Pass stops multiple selected transactions on a station with a UI
+-----------------------------------------------------------------------------------
+Scenario:
+  Multiple EVs are actively charging simultaneously. A Law Enforcement official
+  presents a Master Pass at a Charging Station that has a UI and selects all ongoing
+  transactions to stop.
+
+Steps:
+  1. Ensure two or more transactions are actively ongoing at the Charging Station.
+  2. The user presents a Master Pass IdToken at the Charging Station.
+  3. The Charging Station sends an AuthorizeRequest to the CSMS.
+  4. The CSMS responds with an AuthorizeResponse where:
+       - idToken status is valid (Accepted).
+       - The GroupId equals MasterPassGroupId.
+  5. The Charging Station displays the Master Pass UI listing all active transactions.
+  6. The user selects all active transactions to stop.
+  7. The Charging Station stops each selected transaction and unlocks each cable.
+  8. For each stopped transaction, the Charging Station sends a separate
+     TransactionEventRequest (eventType = Ended, stopReason = MasterPass) to the CSMS.
+  9. The CSMS sends a TransactionEventResponse for each received request.
+
+Expected Result:
+  - All selected transactions are stopped and their cables unlocked.
+  - One TransactionEventRequest per stopped transaction is sent to the CSMS, each
+    with eventType = Ended and stopReason = MasterPass.
+  - The CSMS acknowledges each request with a TransactionEventResponse.
+
+--------------------------------------------------------------------------
+
+TC-C16-03: Master Pass stops all transactions on a station without a UI
+------------------------------------------------------------------------
+Scenario:
+  One or more EVs are actively charging. A Law Enforcement official presents a Master
+  Pass at a Charging Station that has NO display or user interface. Because there is no
+  UI, the station must stop all ongoing transactions automatically.
+
+Steps:
+  1. Ensure at least one transaction is actively ongoing at the Charging Station.
+  2. The user presents a Master Pass IdToken at the Charging Station.
+  3. The Charging Station sends an AuthorizeRequest to the CSMS.
+  4. The CSMS responds with an AuthorizeResponse where:
+       - idToken status is valid (Accepted).
+       - The GroupId equals MasterPassGroupId.
+  5. Because the station has no UI, it does NOT present a selection screen.
+  6. The Charging Station automatically stops ALL ongoing transactions and unlocks
+     all cables.
+  7. For each stopped transaction, the Charging Station sends a
+     TransactionEventRequest (eventType = Ended, stopReason = MasterPass) to the CSMS.
+  8. The CSMS responds with a TransactionEventResponse for each request.
+
+Expected Result:
+  - All ongoing transactions at the station are stopped without any user selection step.
+  - Cables are unlocked for all stopped transactions.
+  - One TransactionEventRequest per stopped transaction is sent to the CSMS, each
+    with eventType = Ended and stopReason = MasterPass.
+  - The CSMS acknowledges each request with a TransactionEventResponse.
+
+--------------------------------------------------------------------------
+
+TC-C16-04: Master Pass authorized from the Authorization Cache (station with UI)
+---------------------------------------------------------------------------------
+Scenario:
+  The Charging Station has cached a previously authorized Master Pass IdToken in its
+  Authorization Cache. The station is temporarily offline or the CSMS is unreachable.
+  A Law Enforcement official presents the cached Master Pass.
+
+Steps:
+  1. Ensure the Master Pass IdToken is present and valid in the station's Authorization
+     Cache with its GroupId matching MasterPassGroupId.
+  2. Ensure at least one transaction is actively ongoing.
+  3. The user presents the Master Pass IdToken.
+  4. The Charging Station checks the Authorization Cache, finds a valid entry with
+     GroupId = MasterPassGroupId, and authorizes the token locally.
+  5. If the station has a UI: the Master Pass UI is shown; the user selects
+     transactions to stop.
+  6. The selected transactions are stopped and cables unlocked.
+  7. TransactionEventRequests (eventType = Ended, stopReason = MasterPass) are sent
+     to the CSMS when connectivity is restored (or immediately if online).
+
+Expected Result:
+  - The Master Pass is accepted using the Authorization Cache.
+  - The Master Pass UI is shown (if station has UI) and transactions can be stopped.
+  - Stopped transactions are reported to the CSMS with the correct event parameters.
+
+--------------------------------------------------------------------------
+
+TC-C16-05: Master Pass authorized from the Local Authorization List (station with UI)
+--------------------------------------------------------------------------------------
+Scenario:
+  The Charging Station has the Master Pass IdToken registered in its Local Authorization
+  List with a GroupId equal to MasterPassGroupId. The user presents this token.
+
+Steps:
+  1. Ensure the Master Pass IdToken is present in the station's Local Authorization List
+     with GroupId = MasterPassGroupId and status = Accepted.
+  2. Ensure at least one transaction is actively ongoing.
+  3. The user presents the Master Pass IdToken.
+  4. The Charging Station consults the Local Authorization List, finds a valid matching
+     entry, and authorizes the token locally without necessarily contacting the CSMS.
+  5. If the station has a UI: the Master Pass UI is shown; the user selects
+     transactions to stop.
+  6. Selected transactions are stopped; cables unlocked.
+  7. TransactionEventRequests (eventType = Ended, stopReason = MasterPass) are sent
+     to the CSMS.
+  8. The CSMS responds with TransactionEventResponses.
+
+Expected Result:
+  - The Master Pass is accepted via the Local Authorization List.
+  - The Master Pass stopping flow proceeds normally as in TC-C16-01.
+
+==========================================================================
+EDGE CASE TEST CASES
+==========================================================================
+
+TC-C16-06: User selects only a subset of transactions to stop (station with UI)
+--------------------------------------------------------------------------------
+Scenario:
+  Multiple transactions are active. The Law Enforcement official intentionally stops
+  only some of them, leaving others running.
+
+Steps:
+  1. Ensure three or more transactions are actively ongoing.
+  2. The user presents the Master Pass IdToken; CSMS authorizes with GroupId =
+     MasterPassGroupId.
+  3. The Master Pass UI is displayed listing all active transactions.
+  4. The user selects only a subset (e.g., two out of three) to stop.
+  5. The station stops only the selected transactions and unlocks only those cables.
+  6. TransactionEventRequests (eventType = Ended, stopReason = MasterPass) are sent
+     only for the stopped transactions.
+  7. The CSMS responds with TransactionEventResponses for each.
+
+Expected Result:
+  - Only the selected transactions are stopped.
+  - Unselected transactions continue charging unaffected.
+  - TransactionEventRequests are sent only for the stopped transactions.
+
+--------------------------------------------------------------------------
+
+TC-C16-07: Master Pass presented when no transactions are active (station with UI)
+-----------------------------------------------------------------------------------
+Scenario:
+  A Law Enforcement official presents a valid Master Pass at a station that currently
+  has no active charging transactions.
+
+Steps:
+  1. Ensure no transactions are currently active at the Charging Station.
+  2. The user presents the Master Pass IdToken.
+  3. The Charging Station sends AuthorizeRequest; CSMS responds with AuthorizeResponse
+     (GroupId = MasterPassGroupId, status = Accepted).
+  4. If the station has a UI: the Master Pass UI is shown with an empty transaction list
+     (no transactions available to stop).
+  5. The user has nothing to select; no stop action is taken.
+
+Expected Result:
+  - The Master Pass is accepted and the UI is shown.
+  - The UI presents an empty list or a "no active transactions" message.
+  - No TransactionEventRequests are sent (nothing was stopped).
+  - No errors occur; the station returns to its idle state.
+
+--------------------------------------------------------------------------
+
+TC-C16-08: Master Pass presented when no transactions are active (station without UI)
+--------------------------------------------------------------------------------------
+Scenario:
+  A Law Enforcement official presents a valid Master Pass at a station without a UI
+  that currently has no active charging transactions.
+
+Steps:
+  1. Ensure no transactions are currently active at the Charging Station.
+  2. The user presents the Master Pass IdToken.
+  3. The Charging Station sends AuthorizeRequest; CSMS responds with AuthorizeResponse
+     (GroupId = MasterPassGroupId, status = Accepted).
+  4. Because there are no active transactions, the station has nothing to stop.
+
+Expected Result:
+  - The Master Pass is accepted.
+  - No TransactionEventRequests are sent (nothing was stopped).
+  - No errors occur; the station returns to its idle state gracefully.
+
+--------------------------------------------------------------------------
+
+TC-C16-09: Master Pass token GroupId is in the Authorization Cache but the cache entry is expired
+---------------------------------------------------------------------------------------------------
+Scenario:
+  The station's Authorization Cache holds a previously valid Master Pass entry, but
+  the cached entry has since expired or been invalidated.
+
+Steps:
+  1. Ensure the Master Pass IdToken exists in the Authorization Cache but the entry
+     is marked as expired or invalid.
+  2. Ensure at least one transaction is actively ongoing.
+  3. The user presents the Master Pass IdToken.
+  4. The Charging Station finds the expired cache entry; it should not accept from
+     cache alone if the entry is invalid.
+  5. The station sends an AuthorizeRequest to the CSMS for a fresh authorization check.
+  6. Observe the CSMS response.
+
+Expected Result:
+  - The station does not blindly accept an expired/invalid cache entry.
+  - A fresh AuthorizeRequest is sent to the CSMS.
+  - If the CSMS confirms validity (GroupId = MasterPassGroupId, Accepted), the
+    Master Pass flow proceeds normally.
+  - If the CSMS returns an invalid/rejected status, the Master Pass flow is denied.
+
+==========================================================================
+FAILURE / NEGATIVE TEST CASES
+==========================================================================
+
+TC-C16-10: Regular (non-Master Pass) IdToken attempts to use Master Pass flow
+------------------------------------------------------------------------------
+Scenario:
+  A regular EV driver presents their normal IdToken. The CSMS returns an Accepted
+  response but the GroupId does NOT equal MasterPassGroupId. The station must not
+  show the Master Pass UI or stop any transactions.
+
+Steps:
+  1. Ensure at least one transaction is actively ongoing.
+  2. A regular user presents a standard IdToken (not a Master Pass).
+  3. The Charging Station sends an AuthorizeRequest to the CSMS.
+  4. The CSMS responds with an AuthorizeResponse where:
+       - idToken status is valid (Accepted).
+       - The GroupId does NOT equal MasterPassGroupId (or GroupId is absent).
+  5. The Charging Station processes this as a normal authorization response.
+
+Expected Result:
+  - The Master Pass UI is NOT shown.
+  - No ongoing transactions are stopped as part of a Master Pass action.
+  - The station handles the token as a regular authorization (e.g., a start or
+    stop of the user's own transaction), not as a Master Pass event.
+
+--------------------------------------------------------------------------
+
+TC-C16-11: Master Pass IdToken is rejected by the CSMS (invalid/unknown token)
+--------------------------------------------------------------------------------
+Scenario:
+  A user presents a token that claims to be a Master Pass, but the CSMS rejects it
+  (e.g., the token is unknown, revoked, or expired).
+
+Steps:
+  1. Ensure at least one transaction is actively ongoing.
+  2. The user presents a Master Pass IdToken.
+  3. The Charging Station sends an AuthorizeRequest to the CSMS.
+  4. The CSMS responds with an AuthorizeResponse where:
+       - idToken status is NOT Accepted (e.g., Invalid, Blocked, or Expired).
+  5. The Charging Station processes the rejection.
+
+Expected Result:
+  - The Master Pass is NOT granted.
+  - The Master Pass UI is NOT shown.
+  - No transactions are stopped.
+  - The station signals to the user that authorization was denied (e.g., via a
+    visual or audible indicator if available).
+
+--------------------------------------------------------------------------
+
+TC-C16-12: Master Pass IdToken attempts to START a new transaction
+------------------------------------------------------------------
+Scenario:
+  A user with a Master Pass IdToken (GroupId = MasterPassGroupId) attempts to start
+  a new charging transaction. The protocol explicitly forbids this.
+
+Steps:
+  1. Ensure no transaction is currently active on the connector being used.
+  2. The user presents the Master Pass IdToken as if initiating a new charge session.
+  3. The Charging Station sends an AuthorizeRequest (or the authorization check
+     occurs as part of a transaction start flow).
+  4. The CSMS responds with an AuthorizeResponse where GroupId = MasterPassGroupId.
+  5. The Charging Station identifies this as a Master Pass token.
+
+Expected Result:
+  - The Charging Station does NOT allow the Master Pass IdToken to start a new
+    transaction (per requirement C16.FR.03).
+  - No new transaction is initiated on the connector.
+  - The station denies the start request for this token.
+
+--------------------------------------------------------------------------
+
+TC-C16-13: CSMS is unreachable when Master Pass is presented (no local cache/list)
+------------------------------------------------------------------------------------
+Scenario:
+  A Law Enforcement official presents a Master Pass but the Charging Station cannot
+  reach the CSMS and the token is not present in the Authorization Cache or Local
+  Authorization List.
+
+Steps:
+  1. Simulate CSMS being unreachable (e.g., disconnect the network).
+  2. Ensure the Master Pass IdToken is NOT in the Authorization Cache or Local
+     Authorization List.
+  3. Ensure at least one transaction is actively ongoing.
+  4. The user presents the Master Pass IdToken.
+  5. The Charging Station attempts to send an AuthorizeRequest but receives no response.
+
+Expected Result:
+  - The Charging Station is unable to authorize the Master Pass token.
+  - No Master Pass UI is shown and no transactions are stopped.
+  - The station handles the offline/timeout condition gracefully (e.g., indicates
+    authorization failure to the user).
+
+--------------------------------------------------------------------------
+
+TC-C16-14: TransactionEventRequest fails to be acknowledged by the CSMS
+------------------------------------------------------------------------
+Scenario:
+  The Master Pass flow completes successfully and transactions are stopped, but the
+  CSMS does not respond to the TransactionEventRequest (e.g., network drops after
+  authorization).
+
+Steps:
+  1. Ensure at least one transaction is actively ongoing.
+  2. The user presents the Master Pass; authorization succeeds (GroupId =
+     MasterPassGroupId, Accepted).
+  3. The station stops the transaction(s) and sends TransactionEventRequests.
+  4. The CSMS does not respond (timeout or network failure).
+
+Expected Result:
+  - The transactions are still stopped and cables unlocked (the physical action
+    is already completed).
+  - The Charging Station retries sending the TransactionEventRequest(s) until
+    acknowledged (standard OCPP retry behavior).
+  - Once connectivity is restored, the CSMS eventually receives and acknowledges
+    the events.
+
+--------------------------------------------------------------------------
+
+TC-C16-15: GroupId in CSMS response matches MasterPassGroupId but is in a different case or format
+----------------------------------------------------------------------------------------------------
+Scenario:
+  The CSMS returns a GroupId that is semantically the same as MasterPassGroupId but
+  differs in case or formatting (e.g., "MasterPass" vs "masterpass"). The station
+  must handle comparison correctly.
+
+Steps:
+  1. Ensure at least one transaction is actively ongoing.
+  2. The user presents a Master Pass IdToken.
+  3. The CSMS responds with an AuthorizeResponse where the GroupId is formatted
+     differently from MasterPassGroupId (e.g., wrong case, trailing spaces).
+  4. Observe whether the Charging Station accepts this as a valid Master Pass.
+
+Expected Result:
+  - The Charging Station applies the comparison rules defined for the MasterPassGroupId
+    configuration variable (case-sensitive or otherwise, per implementation spec).
+  - If the comparison is case-sensitive: the token should NOT be treated as a Master
+    Pass, and the Master Pass flow should not be triggered.
+  - The behavior is consistent and deterministic regardless of input formatting.
+
+==========================================================================
+END OF TEST CASES
+==========================================================================

@@ -1,0 +1,119 @@
+E14 - Check transaction status
+Test Cases
+================================================================================
+
+TC-E14-001
+Title: Unknown transactionId returns ongoingIndicator=false and messagesInQueue=false
+Requirement: E14.FR.01
+Steps:
+  1. Ensure the Charging Station has never processed a transaction with transactionId "TX-UNKNOWN-001".
+  2. The CSMS sends a GetTransactionStatusRequest to the Charging Station with transactionId = "TX-UNKNOWN-001".
+  3. Observe the response returned by the Charging Station.
+Expected Result:
+  The Charging Station sends a GetTransactionStatusResponse.
+  The response field ongoingIndicator is set to false.
+  The response field messagesInQueue is set to false.
+  No other status values are present that contradict these two fields.
+
+--------------------------------------------------------------------------------
+
+TC-E14-002
+Title: Active transaction returns ongoingIndicator=true
+Requirement: E14.FR.02
+Steps:
+  1. Start a transaction on the Charging Station and record its transactionId (e.g., "TX-ACTIVE-001").
+  2. Confirm the transaction has not been stopped (e.g., the EV is still connected and charging or authorized but not ended).
+  3. The CSMS sends a GetTransactionStatusRequest with transactionId = "TX-ACTIVE-001".
+  4. Observe the response returned by the Charging Station.
+Expected Result:
+  The Charging Station sends a GetTransactionStatusResponse.
+  The response field ongoingIndicator is set to true.
+  The messagesInQueue field is present and set to either true or false depending on queue state (not constrained by this requirement).
+
+--------------------------------------------------------------------------------
+
+TC-E14-003
+Title: Stopped transaction returns ongoingIndicator=false
+Requirement: E14.FR.03
+Steps:
+  1. Start a transaction on the Charging Station and record its transactionId (e.g., "TX-STOPPED-001").
+  2. Stop the transaction so that the Charging Station has sent or will send a TransactionEventRequest with eventType = Ended.
+  3. The CSMS sends a GetTransactionStatusRequest with transactionId = "TX-STOPPED-001".
+  4. Observe the response returned by the Charging Station.
+Expected Result:
+  The Charging Station sends a GetTransactionStatusResponse.
+  The response field ongoingIndicator is set to false.
+  The messagesInQueue field is present and set to either true or false depending on queue state (not constrained by this requirement).
+
+--------------------------------------------------------------------------------
+
+TC-E14-004
+Title: Known transactionId with queued messages returns messagesInQueue=true
+Requirement: E14.FR.04
+Steps:
+  1. Arrange conditions so the Charging Station has one or more transaction-related messages pending delivery for a known transactionId (e.g., "TX-QUEUED-001"). This may be simulated by disrupting connectivity so intermediate TransactionEventRequests cannot be delivered.
+  2. The CSMS sends a GetTransactionStatusRequest with transactionId = "TX-QUEUED-001".
+  3. Observe the response returned by the Charging Station.
+Expected Result:
+  The Charging Station sends a GetTransactionStatusResponse.
+  The response field messagesInQueue is set to true.
+  The ongoingIndicator field reflects the actual transaction state (true if ongoing, false if stopped).
+
+--------------------------------------------------------------------------------
+
+TC-E14-005
+Title: Known transactionId with no queued messages returns messagesInQueue=false
+Requirement: E14.FR.05
+Steps:
+  1. Ensure the Charging Station has successfully delivered all transaction-related messages for a known transactionId (e.g., "TX-DELIVERED-001") and no messages remain in the queue for that transaction.
+  2. The CSMS sends a GetTransactionStatusRequest with transactionId = "TX-DELIVERED-001".
+  3. Observe the response returned by the Charging Station.
+Expected Result:
+  The Charging Station sends a GetTransactionStatusResponse.
+  The response field messagesInQueue is set to false.
+  The ongoingIndicator field reflects the actual transaction state (true if ongoing, false if stopped or unknown).
+
+--------------------------------------------------------------------------------
+
+TC-E14-006
+Title: Request without transactionId must not include ongoingIndicator in response
+Requirement: E14.FR.06
+Steps:
+  1. The CSMS sends a GetTransactionStatusRequest to the Charging Station without specifying a transactionId (the transactionId field is absent or null).
+  2. Observe the response returned by the Charging Station.
+Expected Result:
+  The Charging Station sends a GetTransactionStatusResponse.
+  The response does NOT contain the ongoingIndicator field (the field is absent, not merely set to false).
+  The messagesInQueue field is present and set to either true or false depending on queue state.
+
+--------------------------------------------------------------------------------
+
+TC-E14-007
+Title: Request without transactionId with queued messages returns messagesInQueue=true
+Requirement: E14.FR.07
+Steps:
+  1. Arrange conditions so the Charging Station has at least one transaction-related message pending delivery for any transaction (e.g., disrupt connectivity so an intermediate TransactionEventRequest cannot be sent).
+  2. The CSMS sends a GetTransactionStatusRequest without a transactionId.
+  3. Observe the response returned by the Charging Station.
+Expected Result:
+  The Charging Station sends a GetTransactionStatusResponse.
+  The response field messagesInQueue is set to true.
+  The response does NOT contain the ongoingIndicator field.
+
+--------------------------------------------------------------------------------
+
+TC-E14-008
+Title: Request without transactionId with no queued messages returns messagesInQueue=false
+Requirement: E14.FR.08
+Steps:
+  1. Ensure the Charging Station has no transaction-related messages pending delivery for any transaction (all messages have been successfully sent).
+  2. The CSMS sends a GetTransactionStatusRequest without a transactionId.
+  3. Observe the response returned by the Charging Station.
+Expected Result:
+  The Charging Station sends a GetTransactionStatusResponse.
+  The response field messagesInQueue is set to false.
+  The response does NOT contain the ongoingIndicator field.
+
+================================================================================
+END OF TEST CASES
+================================================================================

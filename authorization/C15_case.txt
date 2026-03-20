@@ -1,0 +1,700 @@
+C15 - Unknown Offline Authorization
+Test Cases
+OCPP 2.0.1 Edition 2
+================================================================================
+
+PROTOCOL SUMMARY
+----------------
+C15 covers Offline Authorization of an Unknown Identifier. When a Charging
+Station is offline (no connection to the CSMS), it may still allow an EV Driver
+to start a transaction using an ID token (RFID, PIN, etc.) that is not found in
+the local authorization cache. The behavior is governed by the configuration
+variables OfflineTxForUnknownIdEnabled, StopTxOnInvalidId, MaxEnergyOnInvalidId,
+and TxStopPoint. Once the connection to the CSMS is restored, the Charging
+Station must report the offline transaction and then act on the CSMS response,
+potentially stopping or continuing the transaction.
+
+================================================================================
+HAPPY PATH TEST CASES
+================================================================================
+
+--------------------------------------------------------------------------------
+TC-C15-001: Unknown token accepted offline when OfflineTxForUnknownIdEnabled = true
+--------------------------------------------------------------------------------
+Title: Successful offline authorization of an unknown RFID token
+
+Scenario:
+  The Charging Station is offline. An EV Driver presents an RFID token that is
+  not in the local authorization cache. OfflineTxForUnknownIdEnabled is set to
+  true.
+
+Steps:
+  1. Confirm the Charging Station has no active connection to the CSMS.
+  2. Confirm the Charging Station's local authorization cache does not contain
+     the test token (e.g., AA99999).
+  3. Confirm OfflineTxForUnknownIdEnabled is set to true.
+  4. EV Driver plugs in the charging cable.
+  5. EV Driver presents the unknown RFID token AA99999.
+
+Expected Result:
+  The Charging Station accepts the unknown token and allows the transaction to
+  start. The token is NOT added to the local authorization cache. Energy delivery
+  begins normally.
+
+Requirement covered: C15.FR.08, C15.FR.01
+
+--------------------------------------------------------------------------------
+TC-C15-002: Transaction event sent to CSMS after connection is restored
+--------------------------------------------------------------------------------
+Title: Charging Station reports the offline transaction upon reconnecting
+
+Scenario:
+  A transaction was authorized offline using an unknown token while the Charging
+  Station was disconnected. The CSMS connection is later restored while the
+  transaction is still ongoing.
+
+Steps:
+  1. Complete TC-C15-001 so that an offline transaction is active.
+  2. Restore the network connection between the Charging Station and the CSMS.
+  3. Observe the messages sent by the Charging Station.
+
+Expected Result:
+  As soon as the connection is restored, the Charging Station sends a
+  TransactionEventRequest to the CSMS for the transaction that was authorized
+  offline. The CSMS receives full transaction details including the unknown token.
+
+Requirement covered: C15.FR.02
+
+--------------------------------------------------------------------------------
+TC-C15-003: CSMS accepts the offline transaction - charging continues
+--------------------------------------------------------------------------------
+Title: Transaction continues uninterrupted when CSMS returns Accepted status
+
+Scenario:
+  The CSMS receives the TransactionEventRequest for the offline transaction and
+  responds with idTokenInfo.status = Accepted.
+
+Steps:
+  1. Complete TC-C15-002 so the TransactionEventRequest has been sent.
+  2. Configure the CSMS to respond with idTokenInfo.status = Accepted.
+  3. Observe the Charging Station behavior after receiving the response.
+
+Expected Result:
+  The Charging Station continues energy delivery without interruption. No stop
+  or deauthorization messages are generated.
+
+--------------------------------------------------------------------------------
+TC-C15-004: Authorization using start button (no RFID reader)
+--------------------------------------------------------------------------------
+Title: Transaction starts via physical start button without RFID
+
+Scenario:
+  The Charging Station is equipped with a start button instead of an RFID
+  reader. The EV Driver initiates charging by pressing the button. No token
+  identity is required.
+
+Steps:
+  1. Confirm the Charging Station configuration uses a start button and
+     TxStartPoint includes EVConnected.
+  2. EV Driver plugs in the cable.
+  3. The Charging Station sends StatusNotificationRequest with status Occupied.
+  4. The Charging Station sends TransactionEventRequest with eventType = Started.
+  5. EV Driver presses the start button.
+  6. Optionally, the Charging Station locks the connector (if cable is not
+     permanently attached).
+  7. The Charging Station begins energy delivery.
+  8. The Charging Station sends TransactionEventRequest with eventType = Updated
+     and idToken.type = NoAuthorization.
+
+Expected Result:
+  The CSMS responds with TransactionEventResponse containing
+  idTokenInfo.status = Accepted. The transaction is ongoing and the CSMS is
+  aware of it. No RFID or identity token is required.
+
+--------------------------------------------------------------------------------
+TC-C15-005: Authorization using credit/debit card via payment terminal
+--------------------------------------------------------------------------------
+Title: Transaction authorized through a payment system using a card
+
+Scenario:
+  The Charging Station belongs to a group with a central payment terminal. The
+  EV Driver uses a credit/debit card to authorize charging.
+
+Steps:
+  1. EV Driver plugs in the cable to EVSE 1 on Charging Station CS-001.
+  2. The Charging Station sends StatusNotificationRequest (Occupied) and
+     TransactionEventRequest (eventType = Started, transactionId = AB1234).
+  3. EV Driver taps or inserts their card at the payment terminal.
+  4. The Payment System completes a financial transaction and authorizes the
+     session (TransactionReference = 1234, CS = CS-001, EVSE = 1).
+  5. The Payment System generates a unique virtual token id (e.g., 4444) and
+     sends RequestStartTransactionRequest (evseId = 1, idToken.id = 4444,
+     idToken.type = Central) to the CSMS.
+  6. The CSMS forwards a RequestStartTransactionRequest to the Charging Station.
+  7. The Charging Station responds with RequestStartTransactionResponse (Accepted).
+  8. The Charging Station optionally locks the connector, then starts energy
+     delivery.
+  9. The Charging Station sends TransactionEventRequest (eventType = Updated,
+     chargingState = Charging, trigger = Authorized, idToken.id = 4444,
+     idToken.type = Central).
+
+Expected Result:
+  The CSMS receives the updated TransactionEventRequest and responds with
+  idTokenInfo.status = Accepted. Charging proceeds normally.
+
+--------------------------------------------------------------------------------
+TC-C15-006: Authorization using PIN code
+--------------------------------------------------------------------------------
+Title: Transaction authorized when EV Driver enters a valid PIN
+
+Scenario:
+  The Charging Station has a PIN-code entry terminal. The EV Driver enters their
+  PIN and the CSMS validates it.
+
+Steps:
+  1. EV Driver enters PIN code 1234 at the PIN entry terminal on the Charging
+     Station.
+  2. The Charging Station sends AuthorizeRequest (idToken.id = 1234,
+     idToken.type = PinCode) to the CSMS.
+  3. The CSMS validates the PIN and responds with AuthorizeResponse
+     (idTokenInfo.status = Accepted).
+
+Expected Result:
+  Authorization succeeds. The Charging Station allows the transaction to start.
+
+--------------------------------------------------------------------------------
+TC-C15-007: CSMS-initiated transaction via mobile app
+--------------------------------------------------------------------------------
+Title: Transaction started remotely by the CSMS using a server-generated token
+
+Scenario:
+  An EV Driver uses a mobile app to start charging. The cable is already
+  plugged in. The app sends a start request to the CSMS, which generates a
+  virtual single-use token and sends RequestStartTransactionRequest to the
+  Charging Station. AuthorizeRemoteStart is set to false.
+
+Steps:
+  1. EV Driver plugs in the cable. Transaction starts automatically
+     (eventType = Started, transactionId = AB1234).
+  2. EV Driver taps "Start Charging" in the mobile app.
+  3. The app sends a start request to the CSMS.
+  4. The CSMS generates a unique virtual token (e.g., id = 4444,
+     type = Central).
+  5. The CSMS sends RequestStartTransactionRequest (evseId = 1, idToken.id =
+     4444, idToken.type = Central) to the Charging Station.
+  6. The Charging Station responds with RequestStartTransactionResponse (Accepted).
+  7. The Charging Station sends TransactionEventRequest (eventType = Updated,
+     transactionId = AB1234, trigger = Authorized, idToken.id = 4444,
+     idToken.type = Central).
+
+Expected Result:
+  The CSMS receives the updated transaction event. Charging proceeds. The
+  Central-type virtual token is not cached or re-authorized.
+
+--------------------------------------------------------------------------------
+TC-C15-008: Authorization using a parking ticket (Local id type)
+--------------------------------------------------------------------------------
+Title: Full charge-and-park session authorized by a parking ticket barcode
+
+Scenario:
+  An integrated parking and charging system uses a parking ticket as the
+  authorization token. The EV Driver presents the ticket to start charging and
+  again at the end to stop charging and pay.
+
+Steps:
+  1. EV Driver plugs in the cable. Charging Station sends
+     StatusNotificationRequest (Occupied) and TransactionEventRequest
+     (eventType = Started, transactionId = AB1234).
+  2. EV Driver presents their parking ticket (id = 1234) at the Payment Terminal.
+  3. Charging Station sends AuthorizeRequest (idToken.id = 1234,
+     idToken.type = Local).
+  4. CSMS validates and responds with AuthorizeResponse (Accepted).
+  5. Charging begins. TransactionEventRequest (eventType = Updated,
+     chargingState = Charging, trigger = Authorized, idToken.id = 1234).
+  6. EV Driver returns later and presents the same parking ticket again.
+  7. Payment Terminal sends stop charging request (id = 1234) and matches the
+     ticket ID to transactionId AB1234.
+  8. CSMS sends RequestStopTransactionRequest (transactionId = AB1234).
+  9. Charging Station sends TransactionEventRequest (eventType = Updated,
+     chargingState = EVConnected, trigger = RemoteStop).
+  10. EV Driver pays for parking and charging.
+  11. EV Driver unplugs the cable.
+  12. Charging Station sends StatusNotificationRequest (Available) and
+      TransactionEventRequest (eventType = Ended, transactionId = AB1234).
+
+Expected Result:
+  The complete charge-and-park session is recorded. The Charging Station
+  returns to Available status. The CSMS has full transaction information.
+
+--------------------------------------------------------------------------------
+TC-C15-009: Authorization using ISO 15118 contract certificate (cached check)
+--------------------------------------------------------------------------------
+Title: EV authorized via contract certificate using the authorization cache
+
+Scenario:
+  The EV has a valid contract certificate installed and the Charging Station
+  checks it against a local certificate cache.
+
+Steps:
+  1. EV initiates ISO 15118 communication with the Charging Station.
+  2. EV sends ServiceDiscoveryReq.
+  3. Charging Station responds with ServiceDiscoveryRes listing Contract and
+     ExternalPayment as payment options.
+  4. EV selects Contract via PaymentServiceSelectionReq.
+  5. EV sends PaymentDetailsReq with the ContractCertificateChain and EMAID.
+  6. Charging Station sends AuthorizeRequest (idToken = EMAID,
+     iso15118CertificateHashData) to CSMS.
+  7. CSMS checks the certificate cache and responds with AuthorizeResponse
+     (idTokenInfo, certificateStatus).
+  8. Charging Station completes the ISO 15118 handshake and allows charging.
+
+Expected Result:
+  Authorization completes within the PaymentDetailsReq/Res timeout (5 seconds).
+  Charging starts. The authorization cache entry is used rather than an OCSP
+  live check.
+
+--------------------------------------------------------------------------------
+TC-C15-010: Authorization using ISO 15118 contract certificate (real-time check)
+--------------------------------------------------------------------------------
+Title: EV authorized via contract certificate using a live OCSP check
+
+Scenario:
+  The EV has a valid contract certificate but no valid cache entry exists. The
+  Charging Station must perform a real-time OCSP check.
+
+Steps:
+  1. Follow steps 1 through 5 of TC-C15-009.
+  2. Charging Station sends AuthorizeRequest to the CSMS.
+  3. CSMS sends an OCSP request to the (Sub)CA.
+  4. Because OCSP may take longer than 5 seconds, the ISO 15118 PaymentDetailsRes
+     is sent back to the EV before the OCSP response arrives.
+  5. The ISO 15118 AuthorizationReq/Res exchange (up to 60 second timeout) is
+     used to wait for the OCSP response.
+  6. CSMS receives OCSP response and sends AuthorizeResponse (idTokenInfo,
+     certificateStatus) to the Charging Station.
+  7. Charging Station sends AuthorizationRes to the EV.
+
+Expected Result:
+  Authorization completes during the AuthorizationReq/Res window. Charging
+  starts after the certificate is verified as valid.
+
+================================================================================
+EDGE CASE TEST CASES
+================================================================================
+
+--------------------------------------------------------------------------------
+TC-C15-011: Token not added to cache after offline authorization
+--------------------------------------------------------------------------------
+Title: Unknown token used offline must not be stored in the authorization cache
+
+Scenario:
+  After an offline transaction is authorized using an unknown token (with
+  OfflineTxForUnknownIdEnabled = true), the token must not appear in the
+  local authorization cache.
+
+Steps:
+  1. Complete TC-C15-001 so the transaction is authorized offline.
+  2. Query or inspect the Charging Station's local authorization cache.
+
+Expected Result:
+  The token AA99999 is not present in the authorization cache at any point
+  during or after the offline transaction.
+
+Requirement covered: C15.FR.01
+
+--------------------------------------------------------------------------------
+TC-C15-012: Identify before plug-in using ISO 15118 External Payment
+--------------------------------------------------------------------------------
+Title: EV Driver authorizes before connecting the cable
+
+Scenario:
+  The EV Driver presents their identification at the EVSE before physically
+  connecting the EV. The system completes authorization and then the EV uses
+  ISO 15118 ExternalPayment.
+
+Steps:
+  1. EV Driver presents identification token at the Charging Station before
+     plugging in the cable.
+  2. The Charging Station sends AuthorizeRequest (idToken) to the CSMS.
+  3. The CSMS responds with AuthorizeResponse (idTokenInfo).
+  4. EV Driver plugs in the cable and ISO 15118 communication begins.
+  5. EV sends ServiceDiscoveryReq.
+  6. Charging Station responds with ServiceDiscoveryRes listing ExternalPayment.
+  7. EV selects ExternalPayment via PaymentServiceSelectionReq.
+  8. EV sends AuthorizationReq referencing the already-completed authorization.
+  9. Charging Station sends AuthorizationRes to the EV.
+
+Expected Result:
+  Authorization succeeds using the pre-authorization from step 3. Charging
+  starts. The full sequence completes without requiring re-authorization after
+  plug-in.
+
+--------------------------------------------------------------------------------
+TC-C15-013: Identify after plug-in with 60-second timeout (ISO 15118 External Payment)
+--------------------------------------------------------------------------------
+Title: EV Driver authorizes after connecting the cable within the 60-second window
+
+Scenario:
+  The EV Driver plugs in first, then identifies themselves within the 60-second
+  sequence timeout defined by ISO 15118.
+
+Steps:
+  1. EV Driver plugs in the cable. ISO 15118 communication begins.
+  2. EV sends ServiceDiscoveryReq. Charging Station responds with
+     ServiceDiscoveryRes listing ExternalPayment.
+  3. EV selects ExternalPayment.
+  4. EV sends AuthorizationReq indicating it is waiting for identification.
+  5. Within 60 seconds, the EV Driver presents their identification token.
+  6. Charging Station sends AuthorizeRequest (idToken) to the CSMS.
+  7. CSMS responds with AuthorizeResponse (idTokenInfo).
+  8. Charging Station sends AuthorizationRes to the EV.
+
+Expected Result:
+  Authorization succeeds. Charging starts. If the EV Driver presents their
+  token before the 60-second timeout expires, the session is authorized
+  normally.
+
+--------------------------------------------------------------------------------
+TC-C15-014: Token restricted to specific EVSE(s)
+--------------------------------------------------------------------------------
+Title: Token authorized only for certain EVSEs on a multi-EVSE Charging Station
+
+Scenario:
+  The Charging Station has 3 EVSEs. The EV Driver's token is authorized only
+  for EVSE 1 and EVSE 2, not for EVSE 3.
+
+Steps:
+  1. EV Driver presents an RFID token (AA12345) at EVSE 1.
+  2. Charging Station sends AuthorizeRequest (idToken.id = AA12345,
+     idToken.type = ISO14443).
+  3. CSMS responds with AuthorizeResponse (idTokenInfo.status = Accepted,
+     idTokenInfo.evseId = [1, 2]).
+
+Sub-case A - Driver connects to EVSE 1 or EVSE 2:
+  4a. Charging begins normally.
+
+Sub-case B - Driver connects to EVSE 3:
+  4b. The Charging Station checks idTokenInfo.evseId and finds EVSE 3 is not
+      in the list. The Charging Station rejects the start at EVSE 3.
+
+Expected Result:
+  Sub-case A: Charging starts at EVSE 1 or EVSE 2 as expected.
+  Sub-case B: Charging is refused at EVSE 3. The token is valid but
+  NotAtThisLocation applies.
+
+--------------------------------------------------------------------------------
+TC-C15-015: Token authorized at all EVSEs
+--------------------------------------------------------------------------------
+Title: Token with no EVSE restriction is accepted at any EVSE
+
+Scenario:
+  CSMS returns idTokenInfo without an evseId restriction, meaning the token
+  is valid at all EVSEs.
+
+Steps:
+  1. EV Driver presents RFID token at any EVSE.
+  2. Charging Station sends AuthorizeRequest.
+  3. CSMS responds with AuthorizeResponse (idTokenInfo.status = Accepted) with
+     no evseId field set (or an empty list).
+
+Expected Result:
+  Charging is permitted at any EVSE on that Charging Station.
+
+--------------------------------------------------------------------------------
+TC-C15-016: Charging Station offline - ISO 15118 contract certificate omitted
+           from service list
+--------------------------------------------------------------------------------
+Title: Contract certificate payment option not offered when Charging Station
+       is offline
+
+Scenario:
+  The Charging Station is offline and cannot perform an OCSP certificate status
+  check. It should not offer the Contract certificate payment option.
+
+Steps:
+  1. Confirm the Charging Station has no connection to the CSMS or (Sub)CA.
+  2. EV initiates ISO 15118 communication.
+  3. EV sends ServiceDiscoveryReq.
+  4. Charging Station builds its ServiceDiscoveryRes response.
+
+Expected Result:
+  The ServiceDiscoveryRes lists only ExternalPayment (or other non-certificate
+  options). The Contract payment option is not listed. The EV falls back to
+  External Identification Means (use case C08).
+
+================================================================================
+FAILURE / NEGATIVE TEST CASES
+================================================================================
+
+--------------------------------------------------------------------------------
+TC-C15-017: Unknown token rejected when OfflineTxForUnknownIdEnabled = false
+--------------------------------------------------------------------------------
+Title: Charging Station denies an unknown token when offline authorization is
+       disabled
+
+Scenario:
+  The Charging Station is offline. An EV Driver presents an RFID token that is
+  not in the local authorization cache. OfflineTxForUnknownIdEnabled is set to
+  false.
+
+Steps:
+  1. Confirm the Charging Station is offline.
+  2. Confirm OfflineTxForUnknownIdEnabled is set to false.
+  3. Confirm the test token is not in the local cache.
+  4. EV Driver presents the unknown RFID token.
+
+Expected Result:
+  The Charging Station rejects the token. The transaction does not start.
+  The EV Driver is not authorized to charge.
+
+Requirement covered: C15.FR.08 (negative)
+
+--------------------------------------------------------------------------------
+TC-C15-018: CSMS rejects offline transaction - StopTxOnInvalidId = true,
+            TxStopPoint does NOT contain Authorized/PowerPathClosed/EnergyTransfer
+--------------------------------------------------------------------------------
+Title: Energy transfer stopped and transaction suspended when CSMS rejects the
+       offline token and StopTxOnInvalidId is true (soft stop)
+
+Scenario:
+  A transaction was started offline with an unknown token. When the connection
+  is restored, the CSMS returns a non-Accepted status (e.g., Unknown or Blocked).
+  StopTxOnInvalidId is true but TxStopPoint does NOT contain Authorized,
+  PowerPathClosed, or EnergyTransfer.
+
+Steps:
+  1. Complete TC-C15-001 so an offline transaction is active.
+  2. Restore the CSMS connection.
+  3. Charging Station sends TransactionEventRequest.
+  4. Configure CSMS to respond with idTokenInfo.status = Unknown (or Blocked/
+     Expired/Invalid).
+  5. Confirm StopTxOnInvalidId = true.
+  6. Confirm TxStopPoint does NOT contain Authorized, PowerPathClosed, or
+     EnergyTransfer.
+  7. Observe Charging Station behavior.
+
+Expected Result:
+  The Charging Station immediately stops energy delivery. It sends a
+  TransactionEventRequest (eventType = Updated) with triggerReason =
+  Deauthorized and chargingState = SuspendedEVSE or EVConnected.
+  The transaction record remains (not ended), but no energy is delivered.
+
+Requirement covered: C15.FR.03
+
+--------------------------------------------------------------------------------
+TC-C15-019: CSMS rejects offline transaction - StopTxOnInvalidId = true,
+            TxStopPoint CONTAINS Authorized/PowerPathClosed/EnergyTransfer
+--------------------------------------------------------------------------------
+Title: Transaction fully ended and cable locked when CSMS rejects the offline
+       token and StopTxOnInvalidId is true (hard stop)
+
+Scenario:
+  Same as TC-C15-018 but TxStopPoint CONTAINS at least one of Authorized,
+  PowerPathClosed, or EnergyTransfer.
+
+Steps:
+  1. Complete TC-C15-001 so an offline transaction is active.
+  2. Restore the CSMS connection.
+  3. Charging Station sends TransactionEventRequest.
+  4. Configure CSMS to respond with a non-Accepted status.
+  5. Confirm StopTxOnInvalidId = true.
+  6. Confirm TxStopPoint contains Authorized, PowerPathClosed, or EnergyTransfer.
+  7. Observe Charging Station behavior.
+
+Expected Result:
+  The Charging Station stops the transaction entirely and sends
+  TransactionEventRequest (eventType = Ended) with triggerReason = Deauthorized
+  and stoppedReason = DeAuthorized. If the Charging Station can lock the cable,
+  it SHOULD keep the cable locked until the original token owner presents their
+  identifier.
+
+Requirement covered: C15.FR.04, C15.FR.05
+
+--------------------------------------------------------------------------------
+TC-C15-020: Cable kept locked after forced transaction end until owner re-presents
+            token
+--------------------------------------------------------------------------------
+Title: Locked cable is released only when the original token owner re-identifies
+
+Scenario:
+  A transaction ended due to a rejected offline token (see TC-C15-019). The
+  Charging Station has a cable locking mechanism. The cable should remain locked
+  until the EV Driver presents the same token used to start the transaction.
+
+Steps:
+  1. Complete TC-C15-019 so the transaction is ended with the cable locked.
+  2. A different person attempts to unplug the cable.
+  3. The original EV Driver returns and presents the same token used to start
+     the transaction.
+
+Expected Result:
+  The cable remains locked after the transaction ends and cannot be removed by
+  a different person. When the original token owner presents their token, the
+  Charging Station unlocks the cable and allows unplugging.
+
+Requirement covered: C15.FR.05
+
+--------------------------------------------------------------------------------
+TC-C15-021: CSMS rejects offline token - StopTxOnInvalidId = false,
+            MaxEnergyOnInvalidId exceeded or not implemented
+--------------------------------------------------------------------------------
+Title: Energy delivery halted immediately when maximum energy limit is exceeded
+       or not configured
+
+Scenario:
+  A transaction was started offline. The CSMS rejects the token on reconnection.
+  StopTxOnInvalidId = false and MaxEnergyOnInvalidId is either not implemented
+  or its limit has already been exceeded. TxStopPoint does NOT contain
+  EnergyTransfer.
+
+Steps:
+  1. Complete TC-C15-001 so an offline transaction is active.
+  2. If testing the exceeded case, ensure the EV has already received energy
+     equal to or greater than MaxEnergyOnInvalidId.
+  3. Restore the CSMS connection.
+  4. Configure CSMS to respond with a non-Accepted status.
+  5. Confirm StopTxOnInvalidId = false.
+  6. Confirm MaxEnergyOnInvalidId is not implemented, OR the limit has been met.
+  7. Confirm TxStopPoint does NOT contain EnergyTransfer.
+  8. Observe Charging Station behavior.
+
+Expected Result:
+  The Charging Station stops energy delivery to the EV immediately. It sends
+  TransactionEventRequest (eventType = Updated) with triggerReason =
+  ChargingStateChanged and chargingState = SuspendedEVSE.
+
+Requirement covered: C15.FR.06
+
+--------------------------------------------------------------------------------
+TC-C15-022: CSMS rejects offline token - StopTxOnInvalidId = false,
+            MaxEnergyOnInvalidId set and not yet exceeded
+--------------------------------------------------------------------------------
+Title: Energy delivery continues up to the configured maximum energy limit
+
+Scenario:
+  A transaction was started offline. The CSMS rejects the token on reconnection.
+  StopTxOnInvalidId = false and MaxEnergyOnInvalidId is configured with a limit
+  that has not yet been reached.
+
+Steps:
+  1. Complete TC-C15-001 so an offline transaction is active with minimal
+     energy delivered.
+  2. Restore the CSMS connection.
+  3. Configure CSMS to respond with a non-Accepted status.
+  4. Confirm StopTxOnInvalidId = false.
+  5. Confirm MaxEnergyOnInvalidId is set to a value (e.g., 5 kWh) and that
+     the current delivered energy is below this limit.
+  6. Observe Charging Station behavior while energy is still below the limit.
+  7. Continue monitoring until the MaxEnergyOnInvalidId threshold is reached.
+
+Expected Result:
+  The Charging Station allows energy delivery to continue until the amount
+  specified in MaxEnergyOnInvalidId is reached. Once that threshold is exceeded,
+  energy delivery stops (per TC-C15-021 behavior).
+
+Requirement covered: C15.FR.07
+
+--------------------------------------------------------------------------------
+TC-C15-023: Authorization response with Blocked status
+--------------------------------------------------------------------------------
+Title: Blocked token is rejected and EV Driver cannot start charging
+
+Scenario:
+  An EV Driver presents an RFID token that the CSMS has marked as Blocked.
+  The Charging Station is online.
+
+Steps:
+  1. Confirm the Charging Station is online.
+  2. EV Driver presents RFID token AA12345.
+  3. Charging Station sends AuthorizeRequest (idToken.id = AA12345,
+     idToken.type = ISO14443).
+  4. CSMS responds with AuthorizeResponse (idTokenInfo.status = Blocked).
+
+Expected Result:
+  The Charging Station does not start a transaction. The EV Driver is refused
+  authorization. The error handling response contains the Blocked status to
+  indicate the reason.
+
+--------------------------------------------------------------------------------
+TC-C15-024: Authorization response with Expired status
+--------------------------------------------------------------------------------
+Title: Expired token is rejected and EV Driver cannot start charging
+
+Scenario:
+  An EV Driver presents an RFID token whose validity period has passed.
+
+Steps:
+  1. Confirm the Charging Station is online.
+  2. EV Driver presents an RFID token that has passed its expiry date.
+  3. Charging Station sends AuthorizeRequest to the CSMS.
+  4. CSMS responds with AuthorizeResponse (idTokenInfo.status = Expired).
+
+Expected Result:
+  The Charging Station rejects authorization. The EV Driver is not permitted to
+  charge. The AuthorizeResponse includes the Expired status as the reason.
+
+--------------------------------------------------------------------------------
+TC-C15-025: Authorization response with Invalid status
+--------------------------------------------------------------------------------
+Title: Invalid token is rejected and EV Driver cannot start charging
+
+Scenario:
+  An EV Driver presents a token that the CSMS does not recognize as a valid
+  format or value.
+
+Steps:
+  1. Confirm the Charging Station is online.
+  2. EV Driver presents a token that is malformed or does not exist in the
+     CSMS database.
+  3. Charging Station sends AuthorizeRequest to the CSMS.
+  4. CSMS responds with AuthorizeResponse (idTokenInfo.status = Invalid).
+
+Expected Result:
+  The Charging Station rejects the token. The EV Driver cannot start or stop
+  a transaction. The AuthorizeResponse includes the Invalid status.
+
+--------------------------------------------------------------------------------
+TC-C15-026: Authorization response with NotAtThisLocation status
+--------------------------------------------------------------------------------
+Title: Token valid at another location is refused at the current Charging Station
+
+Scenario:
+  An EV Driver presents a valid token that is authorized at a different
+  location but not at the current Charging Station's EVSEs.
+
+Steps:
+  1. Confirm the Charging Station is online.
+  2. EV Driver presents a token authorized at a different location.
+  3. Charging Station sends AuthorizeRequest to the CSMS.
+  4. CSMS responds with AuthorizeResponse
+     (idTokenInfo.status = NotAtThisLocation).
+
+Expected Result:
+  The Charging Station denies authorization. The EV Driver cannot charge at
+  this location. The status NotAtThisLocation is returned as the reason.
+
+--------------------------------------------------------------------------------
+TC-C15-027: 60-second timeout exceeded for identification after plug-in
+            (ISO 15118 External Payment)
+--------------------------------------------------------------------------------
+Title: Authorization fails when the EV Driver does not identify within 60 seconds
+
+Scenario:
+  The EV Driver plugs in the cable and ISO 15118 communication begins with
+  ExternalPayment selected. The EV Driver does not present any identification
+  token within the 60-second window.
+
+Steps:
+  1. EV Driver plugs in the cable. ISO 15118 AuthorizationReq is sent by the EV.
+  2. No identification is presented by the EV Driver.
+  3. Wait for the 60-second timeout to elapse.
+
+Expected Result:
+  The ISO 15118 session times out. Authorization is not granted. The Charging
+  Station does not start energy delivery. The transaction (if one was pre-started
+  upon cable plug-in) is ended or the EVSE returns to an idle/available state
+  depending on the TxStartPoint configuration.
+
+================================================================================
+END OF TEST CASES
+================================================================================

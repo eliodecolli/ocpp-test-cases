@@ -1,0 +1,56 @@
+C16 - Stop Transaction with a Master Pass
+Table 89. C16 - Stop Transaction with a Master Pass
+Edition 2 FINAL, 2022-12-15 C. Authorization
+OCPP 2.0.1 Edition 2 - � Open Charge Alliance 2022 106/471 Part 2 - Specification
+No. Type Description
+1 Name Stop Transaction with a Master Pass
+2 ID C16
+Functional block C. Authorization
+3 Objectives Enable stopping of transactions by use of a Master Pass (for example for: Law Enforcement
+officials).
+4 Description This use case covers how somebody with a Master Pass (User) can stop (selected) ongoing
+transactions, so the cable becomes unlocked. This Master Pass can be configured in:
+MasterPassGroupId.
+Actors Charging Station, CSMS, User
+Scenario description 1. The User (Law Enforcement official) presents his IdToken at the Charging Station.
+2. The Charging Station sends AuthorizeRequest to the CSMS to request authorization.
+3. Upon receipt of AuthorizeRequest, the CSMS responds with AuthorizeResponse. This response
+message contains a GroupId that equals the value of the Configuration Variable
+MasterPassGroupId and the idToken is valid.
+4a. If the Charging Station has a UI, then the Charging Station "Shows" the Master Pass UI.
+5a. The user selects which transactions to stop.
+6a. The Charging Station stops the selected transaction(s) AND sends a
+TransactionEventRequest (eventType = Ended, stopReason = MasterPass) to the CSMS for every
+stopped transaction.
+7a. Upon receipt of TransactionEventRequest the CSMS responds with
+TransactionEventResponse.
+4b. If the Charging Station does NOT have a UI, then the Charging Station stops all transactions
+AND sends a TransactionEventRequest (eventType = Ended, stopReason = MasterPass) to the
+CSMS for every stopped transaction.
+5b. Upon receipt of TransactionEventRequest the CSMS responds with
+TransactionEventResponse.
+Alternative scenario(s) C16 - Stop Transaction with a Master Pass - Requirements
+Table 90. C16 - Stop Transaction with a Master Pass - Requirements
+ID Precondition Requirement definition
+C16.FR.01 User presents an IdToken that has a groupId
+equal to MasterPassGroupId AND
+The Charging Station has a UI.
+The Charging Station SHALL "show" the Master Pass UI.
+C16.FR.02 User presents an IdToken that has a groupId
+equal to MasterPassGroupId AND the
+Charging Station does NOT have a UI.
+The Charging Station SHALL stop all ongoing transactions.
+C16.FR.03 IdTokens that have a groupId equal to
+MasterPassGroupId
+SHALL NOT be allowed to start a transaction.
+C16.FR.04 IdTokens that have a groupId equal to
+MasterPassGroupId present in the
+Authorization Cache.
+The Charging Station MAY also allow authorization of "Master
+Pass" tokens based on information in the Authorization Cache.
+C16.FR.05 IdTokens that have a groupId equal to
+MasterPassGroupId present in the Local
+Authorization List.
+The Charging Station MAY also allow authorization of "Master
+Pass" tokens based on information in the Local Authorization
+List.

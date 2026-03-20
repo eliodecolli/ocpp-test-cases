@@ -1,0 +1,198 @@
+B02 - Cold Boot Charging Station - Pending
+B02 - Cold Boot Charging Station - Pending
+applies.
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 44/471 Part 2 - Specification
+CSMS Charging Station
+Power up
+opt
+Self check
+BootNotificationRequest(reason, chargingStation)
+BootNotificationResponse(status = Accepted, currentTime, interval)
+opt
+loop [for all Connectors]
+StatusNotificationRequest(connectorStatus = Unavailable)
+StatusNotificationResponse()
+Self check
+loop [for all Connectors]
+alt [Connector was set to Unavailable/Reserved/Faulted prior to (re)boot]
+StatusNotificationRequest(connectorStatus = Unavailable/Reserved/Faulted)
+StatusNotificationResponse()
+[else]
+StatusNotificationRequest(Connectortatus = Available)
+StatusNotificationResponse()
+loop [while powered up and no other messages,with frequency based on Interval from BootNotificationResponse]
+HeartbeatRequest()
+HeartbeatResponse(currentTime)
+Figure 10. Sequence Diagram: Cold Boot Charging Station
+7 Error handling 1. No initial establishment of connection of communication between the CSMS and Charging
+Station: Retry Connection with the CSMS.
+2. No response / time-out from the CSMS: The Charging Station resends BootNotificationRequest
+after a waiting interval. The Charging Station chooses this interval on its own (since it dit not get a
+BootNotificationResponse containing this interval), in a way that avoids flooding the CSMS with
+requests.
+8 Remark(s) Multiple options for a self check are possible: some Charging Stations boot and send status
+notifications with Unavailable, then perform a check of all the hardware and send new
+StatusNotifications with status Available when the Charging Station is up and running. However,
+there is no required order for a self check and sending a BootNotificationRequest. A Charging
+Stations can also do the self check before sending a BootNotificationRequest and determine the
+status before a (mobile) network connection is established and a BootNotificationRequest is
+sent.
+When something is wrong with the Charging Station or EVSE, the status SHALL be set to Faulted.
+Reserved and Unavailable states persist after a reboot.
+B02 - Cold Boot
+Charging Station -
+Pending (for example
+B02.FR.02) for more
+details on sending
+messages on the
+Pending status.
+B01.FR.09 B01.FR.01 The Charging Station SHALL indicate the reason for
+sending the BootNotificationRequest message in
+the reason field.
+For which reason to use,
+see
+BootReasonEnumType.
+B01.FR.10 The Charging Station has received a
+BootNotificationResponse in which
+status is not Accepted
+AND
+the Charging Station sends a RPC
+Framework: CALL message that is
+NOT a BootNotificationRequest or a
+message triggered by one of the
+following messages:
+TriggerMessageRequest,
+GetBaseReportRequest,
+GetReportRequest.
+The CSMS SHALL respond with RPC Framework:
+CALLERROR: SecurityError.
+The Charging Station is
+not allowed to initiate
+sending other messages
+before being accepted.
+B01.FR.11 B01.FR.01 AND
+Security profile 3 is used
+The CSMS SHALL check the SerialNumber in the
+BootNotificationRequest against the Serial Number
+in the Certificate Common Name.
+B01.FR.12 B01.FR.11 AND
+the SerialNumber in the
+BootNotificationRequest does NOT
+equal the Serial Number in the
+Certificate Common Name
+The CSMS SHALL close WebSocket connection.
+B01.FR.13 When an EVSE has been reserved The Reserved state MUST be persistent across
+reboots.
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 46/471 Part 2 - Specification
+B02 - Cold Boot Charging Station - Pending
+Table 37. B02 - Cold Boot Charging Station - Pending
+No. Type Description
+1 Name Cold Boot Charging Station - Pending
+2 ID B02
+Functional block B. Provisioning
+Parent use case B02 - Cold Boot Charging Station - Pending - Requirements
+Table 38. B02 - Requirements
+ID Precondition Requirement definition Note
+B02.FR.01 After the Charging Station received
+the Pending status.
+The CSMS MAY send messages to retrieve
+information from the Charging Station (as
+described in use cases B06, B07, B08) or change its
+configuration by SetVariablesRequest (as
+described in use case B05). The Charging Station
+SHALL respond to these messages.
+The Pending status can
+thus indicate that the
+CSMS wants to retrieve
+or set certain information
+on the Charging Station
+before it will accept the
+Charging Station.
+B02.FR.02 While the CSMS has not yet
+responded to a
+BootNotificationRequest with an
+Accepted status in the
+BootNotificationResponse.
+The Charging Station SHALL NOT send RPC
+Framework: CALL messages (Except
+BootNotificationRequest) to the CSMS, unless it
+has been instructed by the CSMS to do so, using
+one of the following messages:
+TriggerMessageRequest, GetBaseReportRequest,
+GetReportRequest.
+B02.FR.03 While the CSMS has not yet
+responded to a
+BootNotificationRequest with an
+Accepted status in the
+BootNotificationResponse.
+A Charging Station Operator MAY choose to
+configure a Charging Station to accept transactions
+and queue TransactionEventRequest messages to
+be sent to the CSMS
+Parties who want to
+implement this behavior
+must realize that it is
+uncertain if those
+transactions can ever be
+delivered to the CSMS.
+B02.FR.04 While the CSMS has not yet
+responded to a
+BootNotificationRequest with an
+Accepted status in the
+BootNotificationResponse.
+A Charging Station SHALL NOT send
+BootNotificationRequest earlier than the value of
+the Interval field in BootNotificationResponse,
+unless requested to do so with
+TriggerMessageRequest.
+B02.FR.05 While in Pending status AND receiving
+a RequestStartTransactionRequest or
+RequestStopTransactionRequest
+The Charging Station SHALL respond with a
+RequestStartTransactionResponse or
+RequestStopTransactionResponse with status
+Rejected. (Even if the Charging Station is allowed to
+start transaction, see B02.FR.03. If the CSMS wants
+to use RequestStartTransaction etc. it SHALL first
+accept the Charging Station)
+B02.FR.06 When the CSMS returns the Pending
+status
+The communication channel SHALL NOT be closed
+by either the Charging Station or the CSMS.
+B02.FR.07 If the interval in the
+BootNotificationResponse equals 0,
+and the status is other than Accepted,
+The Charging Station SHALL choose a waiting
+interval on its own, in a way that avoids flooding the
+CSMS with requests.
+B02.FR.08 If the interval in the
+BootNotificationResponse > 0, and the
+status is other than Accepted,
+The Charging Station SHALL send a
+BootNotificationRequest after the set interval has
+past.
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 48/471 Part 2 - Specification
+ID Precondition Requirement definition Note
+B02.FR.09 The Charging Station has received a
+BootNotificationResponse with status
+Pending
+AND
+the Charging Station sends a RPC
+Framework: CALL message that is
+NOT a BootNotificationRequest or a
+message triggered by one of the
+following messages:
+TriggerMessageRequest,
+GetBaseReportRequest,
+GetReportRequest.
+The CSMS SHALL respond with RPC Framework:
+CALLERROR: SecurityError.
+The Charging Station is
+not allowed to initiate
+sending other messages
+before being accepted.
+Edition 2 FINAL, 2022-12-15 B. Provisioning
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 49/471 Part 2 - Specification

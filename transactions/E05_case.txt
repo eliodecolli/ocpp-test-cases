@@ -1,0 +1,206 @@
+E05 - Start Transaction - Id not Accepted
+Test Cases
+================================================================================
+
+TC-E05-001
+Title: CSMS verifies identifier validity in every TransactionEventRequest containing an IdToken
+Requirement: E05.FR.01
+Steps:
+  1. Ensure the EV Driver has been locally authorized by the Charging Station (offline authorization).
+  2. The Charging Station sends TransactionEventRequest with eventType = Started, transactionId = AB1234, seqNo = N, timestamp, evse.id = 1, evse.connectorId = 1, and the IdToken presented by the EV Driver.
+  3. Observe the CSMS behavior upon receipt of the message.
+Expected Result:
+  The CSMS inspects the idToken field in the received TransactionEventRequest and performs a validity check against its authorization records. The CSMS does not skip validation even if the IdToken was previously cached or locally authorized. The CSMS returns a TransactionEventResponse containing an idTokenInfo.status field.
+
+--------------------------------------------------------------------------------
+
+TC-E05-002
+Title: Charging Station stops energy delivery immediately when status is not Accepted, StopTxOnInvalidId is false, and MaxEnergyOnInvalidId is not implemented
+Requirement: E05.FR.02
+Steps:
+  1. Configure the Charging Station: StopTxOnInvalidId = false, MaxEnergyOnInvalidId not implemented.
+  2. Configure TxStopPoint so that it does NOT contain EnergyTransfer.
+  3. The EV Driver is locally authorized; the Charging Station sends TransactionEventRequest (eventType = Started, transactionId = AB1234, seqNo = N).
+  4. The CSMS responds with TransactionEventResponse with idTokenInfo.status set to Blocked (or Invalid, Expired, or Unknown).
+  5. Observe the Charging Station behavior.
+Expected Result:
+  The Charging Station immediately stops energy delivery to the EV. The Charging Station then sends a TransactionEventRequest with eventType = Updated, transactionId = AB1234, seqNo = N+1, triggerReason = ChargingStateChanged, and chargingState = SuspendedEVSE. The transaction remains ongoing; the Charging Station does not send eventType = Ended.
+
+--------------------------------------------------------------------------------
+
+TC-E05-003
+Title: Charging Station stops energy delivery immediately when status is not Accepted, StopTxOnInvalidId is false, and MaxEnergyOnInvalidId has been exceeded
+Requirement: E05.FR.02
+Steps:
+  1. Configure the Charging Station: StopTxOnInvalidId = false, MaxEnergyOnInvalidId = 500 Wh (a value that has already been exceeded in the ongoing transaction).
+  2. Configure TxStopPoint so that it does NOT contain EnergyTransfer.
+  3. The EV Driver is locally authorized; the Charging Station sends TransactionEventRequest (eventType = Started, transactionId = AB1234, seqNo = N).
+  4. The CSMS responds with TransactionEventResponse with idTokenInfo.status set to Invalid.
+  5. Observe the Charging Station behavior.
+Expected Result:
+  The Charging Station immediately stops energy delivery. The Charging Station sends TransactionEventRequest with eventType = Updated, transactionId = AB1234, seqNo = N+1, triggerReason = ChargingStateChanged, and chargingState = SuspendedEVSE. The transaction remains ongoing.
+
+--------------------------------------------------------------------------------
+
+TC-E05-004
+Title: Charging Station allows continued energy delivery up to MaxEnergyOnInvalidId when threshold has not been exceeded
+Requirement: E05.FR.03
+Steps:
+  1. Configure the Charging Station: StopTxOnInvalidId = false, MaxEnergyOnInvalidId = 500 Wh.
+  2. Set the current energy delivered in the transaction to 200 Wh (below the threshold).
+  3. The EV Driver is locally authorized; the Charging Station sends TransactionEventRequest (eventType = Started, transactionId = AB1234, seqNo = N).
+  4. The CSMS responds with TransactionEventResponse with idTokenInfo.status set to Expired.
+  5. Observe the Charging Station behavior.
+Expected Result:
+  The Charging Station does NOT stop energy delivery immediately. Energy delivery continues until the total energy delivered in the transaction reaches 500 Wh (the MaxEnergyOnInvalidId threshold). Only after the threshold is reached does the Charging Station stop energy delivery and send a TransactionEventRequest with eventType = Updated, triggerReason = ChargingStateChanged, and chargingState = SuspendedEVSE.
+
+--------------------------------------------------------------------------------
+
+TC-E05-005
+Title: TransactionEventRequest seqNo field is set according to Sequence Number Generation rules
+Requirement: E05.FR.04
+Steps:
+  1. The EV Driver is locally authorized; the Charging Station prepares to send a TransactionEventRequest (eventType = Started) for a new transaction with transactionId = AB1234.
+  2. Note the expected next sequence number N for this transaction.
+  3. The Charging Station sends the TransactionEventRequest (eventType = Started).
+  4. The CSMS responds with TransactionEventResponse with idTokenInfo.status = Blocked.
+  5. The Charging Station sends a subsequent TransactionEventRequest (eventType = Updated, triggerReason = Deauthorized or ChargingStateChanged).
+  6. Inspect the seqNo field in both TransactionEventRequest messages.
+Expected Result:
+  The first TransactionEventRequest (eventType = Started) carries seqNo = N. The second TransactionEventRequest (eventType = Updated) carries seqNo = N+1. Each subsequent TransactionEventRequest for the same transactionId increments seqNo by 1. No seqNo value is skipped or reused within the same transaction.
+
+--------------------------------------------------------------------------------
+
+TC-E05-006
+Title: Meter values with context Transaction.Begin are included in TransactionEventRequest (eventType = Started) when EVSE is known at transaction start
+Requirement: E05.FR.05
+Steps:
+  1. Configure the Charging Station to send meter data in TransactionEventRequest (eventType = Started) per Meter Values - Configuration.
+  2. Ensure the EVSE is known (identified) at the start of the transaction.
+  3. The EV Driver is locally authorized; the Charging Station initiates the transaction.
+  4. Observe the TransactionEventRequest (eventType = Started) sent by the Charging Station.
+Expected Result:
+  The TransactionEventRequest (eventType = Started) contains the meterValue field populated with the configured measurands. Each entry in meterValue has context = Transaction.Begin. The meterValue field is present and not empty.
+
+--------------------------------------------------------------------------------
+
+TC-E05-007
+Title: Signed meter values are placed in signedMeterValue field when SampledDataSignReadings is true
+Requirement: E05.FR.06
+Steps:
+  1. Configure the Charging Station: SampledDataSignReadings = true.
+  2. The EV Driver is locally authorized; the Charging Station initiates the transaction and sends TransactionEventRequest (eventType = Started).
+  3. Observe the meterValue entries in the TransactionEventRequest messages.
+Expected Result:
+  Each sampledValues entry that contains a signed reading has the signedMeterValue field populated with the cryptographic signature of the meter reading. The signedMeterValue field is not null or empty.
+
+--------------------------------------------------------------------------------
+
+TC-E05-008
+Title: Meter values with context Transaction.Begin are included in TransactionEventRequest (eventType = Updated) when EVSE is not known at transaction start
+Requirement: E05.FR.08
+Steps:
+  1. Configure the Charging Station to send meter data in TransactionEventRequest (eventType = Started) per Meter Values - Configuration.
+  2. Ensure the EVSE is NOT known at the start of the transaction (e.g., EVSE assignment occurs after the transaction starts).
+  3. The EV Driver is locally authorized; the Charging Station initiates the transaction and sends TransactionEventRequest (eventType = Started) without meterValue for Transaction.Begin.
+  4. Wait until charging starts and the EVSE becomes known.
+  5. Observe the next TransactionEventRequest (eventType = Updated) sent when charging starts.
+Expected Result:
+  The TransactionEventRequest (eventType = Started) does NOT contain meterValue entries with context = Transaction.Begin. The subsequent TransactionEventRequest (eventType = Updated) that occurs when charging starts contains the meterValue field with the configured measurands and context = Transaction.Begin.
+
+--------------------------------------------------------------------------------
+
+TC-E05-009
+Title: Charging Station stops energy transfer and sends Deauthorized event when StopTxOnInvalidId is true and TxStopPoint does not contain Authorized, PowerPathClosed, or EnergyTransfer
+Requirement: E05.FR.09
+Steps:
+  1. Configure the Charging Station: StopTxOnInvalidId = true.
+  2. Configure TxStopPoint so that it does NOT contain Authorized, PowerPathClosed, or EnergyTransfer.
+  3. The EV Driver is locally authorized; the Charging Station sends TransactionEventRequest (eventType = Started, transactionId = AB1234, seqNo = N).
+  4. The CSMS responds with TransactionEventResponse with idTokenInfo.status = Blocked.
+  5. Observe the Charging Station behavior.
+Expected Result:
+  The Charging Station stops energy transfer. The Charging Station sends TransactionEventRequest with eventType = Updated, transactionId = AB1234, triggerReason = Deauthorized. The same or a subsequent TransactionEventRequest reports chargingState = EVConnected (preferred) or chargingState = SuspendedEVSE. The transaction is NOT ended (eventType != Ended) in this step.
+
+--------------------------------------------------------------------------------
+
+TC-E05-010
+Title: Charging Station ends the transaction and sends Deauthorized when StopTxOnInvalidId is true and TxStopPoint contains Authorized
+Requirement: E05.FR.10
+Steps:
+  1. Configure the Charging Station: StopTxOnInvalidId = true.
+  2. Configure TxStopPoint to contain Authorized.
+  3. The EV Driver is locally authorized; the Charging Station sends TransactionEventRequest (eventType = Started, transactionId = AB1234, seqNo = N).
+  4. The CSMS responds with TransactionEventResponse with idTokenInfo.status = Expired.
+  5. Observe the Charging Station behavior.
+Expected Result:
+  The Charging Station stops the transaction. The Charging Station sends TransactionEventRequest with eventType = Ended, transactionId = AB1234, triggerReason = Deauthorized, and stoppedReason = DeAuthorized. No further TransactionEventRequest messages are sent for this transaction with eventType = Updated after the Ended event.
+
+--------------------------------------------------------------------------------
+
+TC-E05-011
+Title: Charging Station ends the transaction and sends Deauthorized when StopTxOnInvalidId is true and TxStopPoint contains PowerPathClosed
+Requirement: E05.FR.10
+Steps:
+  1. Configure the Charging Station: StopTxOnInvalidId = true.
+  2. Configure TxStopPoint to contain PowerPathClosed.
+  3. The EV Driver is locally authorized; the Charging Station sends TransactionEventRequest (eventType = Started, transactionId = AB1234, seqNo = N).
+  4. The CSMS responds with TransactionEventResponse with idTokenInfo.status = Unknown.
+  5. Observe the Charging Station behavior.
+Expected Result:
+  The Charging Station sends TransactionEventRequest with eventType = Ended, transactionId = AB1234, triggerReason = Deauthorized, and stoppedReason = DeAuthorized. The transaction is fully terminated.
+
+--------------------------------------------------------------------------------
+
+TC-E05-012
+Title: Charging Station ends the transaction and sends Deauthorized when StopTxOnInvalidId is true and TxStopPoint contains EnergyTransfer
+Requirement: E05.FR.10
+Steps:
+  1. Configure the Charging Station: StopTxOnInvalidId = true.
+  2. Configure TxStopPoint to contain EnergyTransfer.
+  3. The EV Driver is locally authorized; the Charging Station sends TransactionEventRequest (eventType = Started, transactionId = AB1234, seqNo = N).
+  4. The CSMS responds with TransactionEventResponse with idTokenInfo.status = Invalid.
+  5. Observe the Charging Station behavior.
+Expected Result:
+  The Charging Station sends TransactionEventRequest with eventType = Ended, transactionId = AB1234, triggerReason = Deauthorized, and stoppedReason = DeAuthorized. The transaction is fully terminated.
+
+--------------------------------------------------------------------------------
+
+TC-E05-013
+Title: Charging Station keeps the cable locked until the owner presents their identifier after transaction is ended due to Deauthorized
+Requirement: E05.FR.11
+Steps:
+  1. Configure the Charging Station: StopTxOnInvalidId = true. Confirm the Charging Station hardware supports cable locking.
+  2. Configure TxStopPoint to contain Authorized (satisfying E05.FR.10 precondition).
+  3. The EV Driver is locally authorized; the Charging Station sends TransactionEventRequest (eventType = Started, transactionId = AB1234, seqNo = N).
+  4. The CSMS responds with TransactionEventResponse with idTokenInfo.status = Blocked.
+  5. The Charging Station sends TransactionEventRequest (eventType = Ended, triggerReason = Deauthorized, stoppedReason = DeAuthorized).
+  6. Attempt to physically remove the charging cable without presenting any identifier.
+  7. Have the original owner present their identifier to the Charging Station.
+Expected Result:
+  After step 6, the cable remains physically locked and cannot be removed. After step 7, the Charging Station unlocks the cable, allowing it to be removed. The cable lock state is not released before the owner's identifier is presented.
+
+--------------------------------------------------------------------------------
+
+TC-E05-014
+Title: Full E05 nominal sequence - locally authorized IdToken rejected by CSMS, transaction suspended
+Requirement: E05.FR.01, E05.FR.02, E05.FR.04
+Steps:
+  1. Configure the Charging Station: StopTxOnInvalidId = false, MaxEnergyOnInvalidId not implemented. TxStopPoint does NOT contain EnergyTransfer.
+  2. The EV Driver is locally authorized by the Charging Station (offline).
+  3. The Charging Station sends TransactionEventRequest (eventType = Started, transactionId = AB1234, seqNo = N, timestamp, evse.id = 1, evse.connectorId = 1, meterValues).
+  4. The CSMS validates the IdToken and determines it is not accepted (e.g., status = Blocked).
+  5. The CSMS sends TransactionEventResponse with idTokenInfo.status = Blocked.
+  6. The Charging Station stops energy delivery.
+  7. The Charging Station sends TransactionEventRequest (eventType = Updated, transactionId = AB1234, seqNo = N+1, timestamp, chargingState = SuspendedEVSE, triggerReason = ChargingStateChanged, meterValues).
+  8. The CSMS sends TransactionEventResponse.
+Expected Result:
+  Step 3: TransactionEventRequest is received by CSMS with eventType = Started and seqNo = N.
+  Step 5: TransactionEventResponse contains idTokenInfo.status = Blocked.
+  Step 6: No energy is flowing to the EV after the CSMS response.
+  Step 7: TransactionEventRequest is received by CSMS with eventType = Updated, seqNo = N+1, chargingState = SuspendedEVSE, triggerReason = ChargingStateChanged.
+  Step 8: TransactionEventResponse is returned. The transaction remains ongoing (no Ended event); the cable remains locked; no energy is delivered.
+
+================================================================================
+END OF TEST CASES
+================================================================================

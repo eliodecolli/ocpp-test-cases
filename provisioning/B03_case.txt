@@ -1,0 +1,128 @@
+B03 - Cold Boot Charging Station - Rejected - Test Cases
+
+GOAL: Define the behavior of a Charging Station and CSMS when the station is rejected by the CSMS. The station must retry periodically but stay silent in between, and the CSMS must not initiate messages.
+
+================================================================================
+
+TEST CASE 1: CSMS rejects Charging Station — station enters Rejected state
+Scenario: CSMS does not accept the station (e.g., it is blacklisted).
+Steps:
+  1. Charging Station sends BootNotificationRequest.
+  2. CSMS responds with BootNotificationResponse(status = Rejected, interval = X).
+Expected result:
+  - Charging Station enters Rejected state.
+  - Charging Station does not send any OCPP messages until the interval expires.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 2: Station retries BootNotification after interval (interval > 0)
+Scenario: Charging Station received a Rejected response with a positive interval.
+Steps:
+  1. CSMS responds with BootNotificationResponse(status = Rejected, interval = X, where X > 0).
+  2. Charging Station waits X seconds.
+  3. Charging Station sends BootNotificationRequest again.
+Expected result:
+  - Charging Station waits the full X seconds before retrying.
+  - A new BootNotificationRequest is sent after that.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 3: Station chooses its own retry interval when interval is 0
+Scenario: CSMS returns Rejected with interval = 0.
+Steps:
+  1. CSMS responds with BootNotificationResponse(status = Rejected, interval = 0).
+  2. Charging Station must retry at some point.
+Expected result:
+  - Charging Station selects its own retry interval.
+  - The chosen interval avoids flooding the CSMS with requests.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 4: CSMS does NOT initiate messages during Rejected
+Scenario: While a station is in Rejected status, the CSMS must not send messages to it.
+Steps:
+  1. Charging Station is in Rejected status.
+  2. CSMS attempts to send a message (other than TriggerMessageRequest for BootNotification).
+Expected result:
+  - CSMS does not initiate messages to the Charging Station during the Rejected period.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 5: Station responds with SecurityError to unauthorized CSMS messages
+Scenario: CSMS sends a message (not TriggerMessageRequest(BootNotification)) while station is Rejected.
+Steps:
+  1. Charging Station is in Rejected status.
+  2. CSMS sends a message that is not TriggerMessageRequest(requestedMessage = BootNotification).
+  3. Charging Station receives the message.
+Expected result:
+  - Charging Station responds with CALLERROR: SecurityError.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 6: Station responds with SecurityError to its own unauthorized messages
+Scenario: While Rejected, the Charging Station itself tries to send a non-BootNotification message.
+Steps:
+  1. Charging Station is in Rejected status.
+  2. Charging Station sends a message that is not a BootNotificationRequest.
+  3. CSMS receives the message.
+Expected result:
+  - CSMS responds with CALLERROR: SecurityError.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 7: Station may close the connection during Rejected
+Scenario: Charging Station is in Rejected status and decides to close the communication channel.
+Steps:
+  1. Charging Station is in Rejected status.
+  2. Charging Station closes the connection (e.g., closes WebSocket or shuts down communication hardware).
+  3. When the retry interval expires, Charging Station reconnects and sends BootNotificationRequest.
+Expected result:
+  - Connection closure is permitted.
+  - Charging Station reconnects when it is time to retry.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 8: CSMS may also close the connection during Rejected
+Scenario: CSMS decides to close the connection to free system resources.
+Steps:
+  1. Charging Station is in Rejected status.
+  2. CSMS closes the communication channel.
+Expected result:
+  - The CSMS is permitted to close the connection.
+  - Charging Station must handle reconnection when the retry interval expires.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 9: Locally authorized transactions may still proceed (if configured)
+Scenario: The CSO has configured the station to allow local transactions even before being accepted.
+Steps:
+  1. Charging Station is in Rejected status.
+  2. It is configured to allow local transactions.
+  3. A local EV user initiates a charge.
+Expected result:
+  - Charging Station may accept the local transaction.
+  - Behavior is operator-configured; it is not guaranteed that these transactions are ever reported.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 10: No new transactions by default during Rejected
+Scenario: The station is not configured to accept transactions before being accepted.
+Steps:
+  1. Charging Station is in Rejected status (default config).
+  2. A local EV user attempts to start a charge.
+Expected result:
+  - Charging Station does not authorize or start the transaction.
+  - It is advised not to accept transactions until BootNotification is accepted.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 11: Rejected station eventually becomes Accepted after retrying
+Scenario: CSMS was temporarily refusing the station; after retries, status changes to Accepted.
+Steps:
+  1. Charging Station is in Rejected status; it retries periodically.
+  2. CSMS eventually responds with BootNotificationResponse(status = Accepted).
+  3. Normal B01 behavior resumes.
+Expected result:
+  - Charging Station transitions to Accepted and proceeds with B01 flow (StatusNotifications, Heartbeats, etc.).
+
+--------------------------------------------------------------------------------

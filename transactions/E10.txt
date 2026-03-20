@@ -1,0 +1,90 @@
+E10 - Connection Loss During Transaction
+5 Prerequisite(s) The Charging Station is Offline.
+The EV Driver is offline/locally authorized by the Charging Station.
+6 Postcondition(s) Successful postcondition:
+The TransactionEventRequest has been responded to by the CSMS AND has been removed from
+the queue of the Charging Station. 
+Failure postcondition:
+The TransactionEventRequest was NOT responded to by the CSMS AND remains in the queue of
+the Charging Station.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 135/471 Part 2 - Specification
+EV Driver
+Charging StationCSMS
+Charging Station is Offline
+Offline user authorization successful
+opt
+notification
+lock connector
+start energy offer
+store TransactionEventRequest(offline = true)
+Connection loss can be minutes, but can also be days.
+Connection restored.
+HeartbeatRequest()
+HeartbeatResponse()
+send queued message()
+loop[for all queued transaction messages]
+TransactionEventRequest(offline = true)
+TransactionEventResponse(...)
+Figure 48. Sequence Diagram: Transaction started while Charging Station is offline
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 136/471 Part 2 - Specification
+7 Error handling n/a
+8 Remark(s) The scenario description and sequence diagram above are based on the Configuration Variable
+for start transaction being configured as follows:
+TxStartPoint: Authorized, DataSigned, PowerPathClosed, EnergyTransfer
+This use-case is also valid for other configurations, but then the transaction might start/stop at
+another moment, which might change the sequence in which message are sent. For more details
+see the use cases: E10 - When cable disconnected on EV-side: Suspend Transaction
+Table 114. E10 - When cable disconnected on EV-side: Suspend Transaction
+No. Type Description
+1 Name When cable disconnected on EV-side: Suspend Transaction
+2 ID E10
+Functional block E. Transactions
+Parent use case E10 - When cable disconnected on EV-side: Suspend Transaction - Requirements
+Table 115. E10 - Requirements
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 158/471 Part 2 - Specification
+ID Precondition Requirement definition Note
+E10.FR.01 Cable not permanently attached The Connector SHALL remain locked at the
+Charging Station until the EV Driver presents the
+IdToken.
+E10.FR.02 Cable permanently attached
+AND
+Cable not plugged in within timeout
+The Charging Station SHALL deauthorize the
+transaction.
+E10.FR.03 When a TransactionEventRequest has
+to be created
+The Charging Station SHALL set the message’s
+seqNo field as specified in Sequence Number
+Generation.
+This enables the CSMS
+to track the
+completeness of
+transaction information
+E10.FR.04 When configured to send meter data
+in the TransactionEventRequest
+(eventType = Ended), See: Meter
+Values - Configuration
+The Charging Station SHALL add the configured
+measurands to the optional meterValue field in the
+TransactionEventRequest(eventType = Ended) sent
+to the CSMS to provide more details about
+transaction usage.
+E10.FR.05 E10.FR.04
+AND
+The Charging Station is running low on
+memory
+The Charging Station MAY drop meter data in the
+TransactionEventRequest(eventType = Ended)
+message.
+E10.FR.06 E10.FR.05 When dropping meter data, the Charging Station
+SHALL drop intermediate values first (1st value, 3th
+value, 5th etc), not start dropping values from the
+start of the list or stop adding values to the list.
+E10.FR.07 SampledDataSignReadings is true The Charging Station SHALL retrieve signed meter
+values and put them in the signedMeterValue field
+of sampledValues.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 159/471 Part 2 - Specification

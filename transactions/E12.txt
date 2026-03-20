@@ -1,0 +1,110 @@
+E12 - Transaction-related message not accepted by CSMS.
+8 Remark(s) If the Charging Station has implemented an Authorization Cache, then upon receipt of
+TransactionEventResponse, the Charging Station updates the cache entry.
+The scenario description and sequence diagram above are based on the Configuration Variable
+for start & stop transaction being configured as follows:
+TxStartPoint: EVConnected, Authorized, DataSigned, PowerPathClosed, EnergyTransfer
+This use-case is also valid for other configurations, but then the transaction might start at another
+moment, which might change the sequence in which message are sent. For more details see the
+use cases: E12 - Transaction-related message not
+accepted by CSMS.
+The scenario description and sequence diagram above are based on the Configuration Variable
+for start transaction being configured as follows:
+TxStartPoint: Authorized, DataSigned, PowerPathClosed, EnergyTransfer
+This use-case is also valid for other configurations, but then the transaction might start/stop at
+another moment, which might change the sequence in which message are sent. For more details
+see the use cases: E12 - Inform CSMS of an Offline Occurred Transaction
+Table 118. E12 - Inform CSMS of an Offline Occurred Transaction
+No. Type Description
+1 Name Inform CSMS of an Offline Occurred Transaction
+2 ID E12
+Functional block E. Transactions
+3 Objective(s) To enable the Charging Station to inform the CSMS that a transaction occurred while the
+Charging Station was Offline.
+4 Description This use case covers how the Charging Station starts and stops a transaction since connection
+loss.
+Actors Charging Station, CSMS
+Scenario description 1. The connection with the CSMS is restored.
+2. The Charging Station sends a Heartbeat message to the CSMS.
+3. The Charging Station sends TransactionEventRequest (eventType = Started, offline = TRUE) to
+the CSMS.
+4. The CSMS responds with TransactionEventResponse, accepting the transaction.
+5. The Charging Station sends TransactionEventRequest (eventType = Updated, offline = TRUE)
+6. The CSMS responds with TransactionEventResponse.
+7. The Charging Station sends TransactionEventRequest (eventType = Ended, offline = TRUE)
+8. The CSMS responds with TransactionEventResponse.
+5 Prerequisite(s) At least one Offline transaction has taken place.
+6 Postcondition(s) Successful postcondition:
+The CSMS has processed all transactions that occurred Offline.
+Failure postcondition:
+n/a
+Charging StationCSMS
+Charging Station is Offline and a transaction has occurred.
+Connection restored.
+HeartbeatRequest()
+HeartbeatResponse()
+send queued message()
+loop[for all queued TransactionEvent messages since connection loss]
+TransactionEventRequest(transactionId = X, offline = true)
+TransactionEventResponse()
+Figure 62. Sequence Diagram: Inform CSMS of an Offline Occurred Transaction
+7 Error handling n/a
+8 Remark(s) n/a
+E12 - Inform CSMS of an Offline Occurred Transaction - Requirements
+Table 119. E12 - Requirements
+ID Precondition Requirement definition
+E12.FR.01 When Offline The Charging Station MUST queue all TransactionEventRequest
+messages, that it would have sent to the CSMS if the Charging
+Station had been online.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 162/471 Part 2 - Specification
+ID Precondition Requirement definition
+E12.FR.02 After the connection is restored. The Charging Station MUST send queued
+TransactionEventRequest messages with the flag offline set to
+TRUE.
+E12.FR.03 When configured to send meter data in the
+TransactionEventRequest(eventType =
+Updated), See: Meter Values - Configuration
+The Charging Station SHALL add the configured measurands to
+the optional meterValue field in the TransactionEventRequest
+(eventType = Updated) sent to the CSMS to provide more details
+during the transaction.
+E12.FR.04 E12.FR.03
+AND
+Offline
+AND
+The Charging Station is running low on memory
+The Charging Station MAY drop TransactionEventRequest
+(eventType = Updated) messages.
+E12.FR.05 E12.FR.04 When dropping TransactionEventRequest(eventType = Updated)
+messages, the Charging Station SHALL drop intermediate
+messages first (1st message, 3th message, 5th message etc.),
+not start dropping messages from the start or stop adding
+messages to the queue.
+E12.FR.06 E12.FR.03
+AND
+Amount of meter data is too much for 1
+TransactionEventRequest(eventType = Updated)
+The Charging Station MAY split the meter data over multiple
+TransactionEventRequest(eventType = Updated) messages with
+the same timestamp.
+E12.FR.07 When configured to send meter data in the
+TransactionEventRequest(eventType = Ended),
+See: Meter Values - Configuration
+The Charging Station SHALL add the configured measurands to
+the optional meterValue field in the TransactionEventRequest
+(eventType = Ended) sent to the CSMS to provide more details
+about transaction usage.
+E12.FR.08 E12.FR.07
+AND
+The Charging Station is running low on memory
+The Charging Station MAY drop meter data in the
+TransactionEventRequest(eventType = Ended) message.
+E12.FR.09 E12.FR.08 When dropping meter data, the Charging Station SHALL drop
+intermediate values first (1st value, 3th value, 5th etc), not start
+dropping values from the start of the list or stop adding values to
+the list.
+E12.FR.10 SampledDataSignReadings is true The Charging Station SHALL retrieve signed meter values and
+put them in the signedMeterValue field of sampledValues.
+Edition 2 FINAL, 2022-12-15 E. Transactions
+OCPP 2.0.1 Edition 2 - © Open Charge Alliance 2022 163/471 Part 2 - Specification

@@ -1,0 +1,77 @@
+E13 - Transaction-related message not accepted by CSMS
+Test Cases
+================================================================================
+
+TC-E13-001
+Title: Retry count and interval are configurable via Configuration Variables
+Requirement: E13.FR.01
+Steps:
+  1. On the Charging Station, set MessageAttemptsTransactionEvent to a specific integer value (e.g., 5).
+  2. On the Charging Station, set MessageAttemptIntervalTransactionEvent to a specific integer value (e.g., 30).
+  3. Trigger a transaction-related message send that results in a failure (e.g., CSMS returns an error response or does not reply within MessageTimeout).
+  4. Observe the number of retry attempts the Charging Station makes and the wait intervals between them.
+Expected Result:
+  The Charging Station makes retry attempts up to the count set in MessageAttemptsTransactionEvent (5 in this example).
+  The wait interval before each retry corresponds to the value of MessageAttemptIntervalTransactionEvent multiplied by the number of preceding failed transmissions, as configured (30 seconds x attempt number in this example).
+  Changing either Configuration Variable on the Charging Station causes subsequent retry behavior to reflect the new values without requiring a restart of the use case scenario.
+
+--------------------------------------------------------------------------------
+
+TC-E13-002
+Title: Charging Station retries a failed transaction-related message until acceptance
+Requirement: E13.FR.02
+Steps:
+  1. Configure MessageAttemptsTransactionEvent to 3 on the Charging Station.
+  2. Configure MessageAttemptIntervalTransactionEvent to 60 on the Charging Station.
+  3. Have the Charging Station send a TransactionEventRequest to the CSMS.
+  4. Cause the CSMS to reject or fail to process the message on the first attempt (attempt 1 of 3).
+  5. After the appropriate wait interval, observe that the Charging Station resends the same TransactionEventRequest (attempt 2 of 3).
+  6. Cause the CSMS to reject or fail to process the message on the second attempt.
+  7. After the appropriate wait interval, observe that the Charging Station resends the same TransactionEventRequest (attempt 3 of 3).
+  8. On the third attempt, configure the CSMS to accept the message and return a success response.
+Expected Result:
+  The Charging Station resends the TransactionEventRequest after each failure, for as long as the total number of failures has not reached the value of MessageAttemptsTransactionEvent.
+  On attempt 3, the CSMS accepts the message and returns a successful response.
+  The Charging Station does not discard the message; it proceeds to process the next transaction-related message normally.
+  Exactly 3 transmissions of the same message are observed in total (1 original + 2 retries).
+
+--------------------------------------------------------------------------------
+
+TC-E13-003
+Title: Wait interval before each retry equals attempt number multiplied by MessageAttemptIntervalTransactionEvent
+Requirement: E13.FR.03
+Steps:
+  1. Configure MessageAttemptsTransactionEvent to 3 on the Charging Station.
+  2. Configure MessageAttemptIntervalTransactionEvent to 60 on the Charging Station.
+  3. Have the Charging Station send a TransactionEventRequest to the CSMS.
+  4. Cause the CSMS to reject or not reply within MessageTimeout on the first attempt.
+  5. Record the timestamp of the first failure and the timestamp of the first retry transmission.
+  6. Cause the CSMS to reject or not reply within MessageTimeout on the second attempt (first retry).
+  7. Record the timestamp of the second failure and the timestamp of the second retry transmission.
+Expected Result:
+  The elapsed time between the first failure and the first retry transmission is approximately 60 seconds (1 preceding transmission x 60 seconds).
+  The elapsed time between the second failure and the second retry transmission is approximately 120 seconds (2 preceding transmissions x 60 seconds).
+  No retry is sent before the computed wait interval has elapsed.
+  Each retry carries the identical message content as the original TransactionEventRequest (same transactionId, seqNo, eventType, and all other fields).
+
+--------------------------------------------------------------------------------
+
+TC-E13-004
+Title: Message is discarded and processing continues after final attempt fails
+Requirement: E13.FR.04
+Steps:
+  1. Configure MessageAttemptsTransactionEvent to 3 on the Charging Station.
+  2. Configure MessageAttemptIntervalTransactionEvent to 60 on the Charging Station.
+  3. Have the Charging Station send a TransactionEventRequest to the CSMS.
+  4. Cause the CSMS to reject or not reply on every attempt until the total number of failures equals the value of MessageAttemptsTransactionEvent (3 failures total: original attempt + 2 retries).
+  5. Observe the Charging Station behavior after the final attempt fails.
+  6. Queue a second pending transaction-related message (e.g., a second TransactionEventRequest) and observe whether the Charging Station processes it.
+Expected Result:
+  After the third consecutive failure, the Charging Station does not attempt to send the TransactionEventRequest a fourth time.
+  The Charging Station discards the failed message; it is no longer queued or retried.
+  The Charging Station moves on to the next pending transaction-related message and attempts to deliver it.
+  No error or exception prevents the Charging Station from continuing normal operation after discarding the message.
+
+================================================================================
+END OF TEST CASES
+================================================================================

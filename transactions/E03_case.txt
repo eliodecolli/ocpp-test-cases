@@ -1,0 +1,294 @@
+E03 - Start Transaction - IdToken First
+Test Cases
+================================================================================
+
+TC-E03-001
+Title: TransactionEventRequest (Started) includes IdToken information when IdToken is known
+Requirement: E03.FR.01
+Steps:
+  1. EV Driver presents a valid IdToken at the Charging Station before plugging in a cable.
+  2. The Charging Station performs authorization (local or via CSMS).
+  3. Authorization succeeds and the IdToken is known to the Charging Station.
+  4. Observe the first TransactionEventRequest sent by the Charging Station to the CSMS.
+Expected Result:
+  The TransactionEventRequest has eventType = Started and contains a populated idToken field
+  (idToken.id = the presented token value, e.g. "1234"). The idToken field MUST NOT be absent
+  or null.
+
+--------------------------------------------------------------------------------
+
+TC-E03-002
+Title: CSMS responds to TransactionEventRequest with authorization status
+Requirement: E03.FR.02
+Steps:
+  1. EV Driver presents a valid IdToken at the Charging Station.
+  2. Charging Station sends TransactionEventRequest (eventType = Started) containing
+     IdTokenType information (satisfying E03.FR.01).
+  3. CSMS receives the TransactionEventRequest.
+  4. Observe the CSMS response.
+Expected Result:
+  The CSMS sends a TransactionEventResponse that includes the idTokenInfo.status field.
+  The field value is a valid AuthorizationStatusEnumType (e.g. Accepted). The response
+  MUST be sent regardless of any internal sanity-check outcome on the request payload.
+
+--------------------------------------------------------------------------------
+
+TC-E03-003
+Title: TransactionEventRequest (Started) includes reservationId when transaction ends a reservation
+Requirement: E03.FR.03
+Steps:
+  1. A reservation exists on the Charging Station for a specific IdToken (reservationId known).
+  2. EV Driver presents the IdToken that matches the existing reservation.
+  3. Authorization succeeds and the Charging Station creates a new transaction that ends
+     the reservation.
+  4. Observe the TransactionEventRequest sent by the Charging Station to the CSMS.
+Expected Result:
+  The TransactionEventRequest (eventType = Started) contains the reservationId field set to
+  the identifier of the reservation that was ended. The field MUST be present and match the
+  known reservationId.
+
+--------------------------------------------------------------------------------
+
+TC-E03-004
+Title: Charging Station ends transaction with Timeout reason when cable is not plugged in before EVConnectionTimeOut and TxStopPoint does not contain ParkingBayOccupancy
+Requirement: E03.FR.05
+Steps:
+  1. Configure EVConnectionTimeOut to a short value (e.g. 30 seconds) on the Charging Station.
+  2. Ensure TxStopPoint does NOT contain ParkingBayOccupancy.
+  3. EV Driver presents a valid IdToken; authorization succeeds.
+  4. Charging Station sends TransactionEventRequest (eventType = Started).
+  5. Do NOT plug in a charging cable.
+  6. Wait for the EVConnectionTimeOut duration to elapse.
+  7. Observe the message sent by the Charging Station to the CSMS.
+Expected Result:
+  The Charging Station sends a TransactionEventRequest with:
+    - eventType = Ended
+    - stoppedReason = Timeout
+    - triggerReason = EVConnectionTimeout
+    - transactionId = the same transaction identifier used in the Started event
+    - meterValues field populated if applicable
+  The CSMS responds with a TransactionEventResponse. No charging session is established.
+
+--------------------------------------------------------------------------------
+
+TC-E03-005
+Title: seqNo field is set correctly in every TransactionEventRequest
+Requirement: E03.FR.06
+Steps:
+  1. EV Driver presents a valid IdToken; authorization succeeds.
+  2. Charging Station sends TransactionEventRequest (eventType = Started) — record seqNo (N).
+  3. EV Driver plugs in the cable within EVConnectionTimeOut.
+  4. Charging Station sends TransactionEventRequest (eventType = Updated, chargingState =
+     EVConnected) — record seqNo.
+  5. Charging Station sends TransactionEventRequest (eventType = Updated, chargingState =
+     Charging) — record seqNo.
+  6. Compare seqNo values across all three messages.
+Expected Result:
+  Each TransactionEventRequest for the same transaction carries a seqNo value that strictly
+  follows the Sequence Number Generation rules defined in the specification: the first message
+  has seqNo = N, the second has seqNo = N + 1, the third has seqNo = N + 2. No gaps or
+  duplicates are permitted within the same transaction.
+
+--------------------------------------------------------------------------------
+
+TC-E03-006
+Title: Meter data with context Transaction.Begin is included in TransactionEventRequest (Started) when EVSE is known at transaction start
+Requirement: E03.FR.07
+Steps:
+  1. Configure the Charging Station to send meter data in TransactionEventRequest
+     (eventType = Started) for a specific set of measurands.
+  2. Ensure the EVSE is identified (known) at the time the IdToken is presented.
+  3. EV Driver presents a valid IdToken; authorization succeeds.
+  4. Observe the TransactionEventRequest (eventType = Started) sent to the CSMS.
+Expected Result:
+  The TransactionEventRequest (eventType = Started) contains the meterValue field populated
+  with the configured measurands. Each sampledValue entry within meterValue has
+  context = Transaction.Begin.
+
+--------------------------------------------------------------------------------
+
+TC-E03-007
+Title: Meter data is included in TransactionEventRequest (Updated) when configured
+Requirement: E03.FR.08
+Steps:
+  1. Configure the Charging Station to send meter data in TransactionEventRequest
+     (eventType = Updated).
+  2. EV Driver presents a valid IdToken; authorization succeeds.
+  3. EV Driver plugs in the cable; charging starts.
+  4. Observe the TransactionEventRequest (eventType = Updated, chargingState = Charging)
+     sent to the CSMS.
+Expected Result:
+  The TransactionEventRequest (eventType = Updated) contains the meterValue field populated
+  with the configured measurands. The field MUST NOT be absent when the station is configured
+  to send meter data for Updated events.
+
+--------------------------------------------------------------------------------
+
+TC-E03-008
+Title: Charging Station may split excess meter data across multiple TransactionEventRequest (Updated) messages with the same timestamp
+Requirement: E03.FR.09
+Steps:
+  1. Configure the Charging Station to report a large number of measurands in
+     TransactionEventRequest (eventType = Updated).
+  2. Select a measurand configuration that produces more meter data than fits in a single
+     TransactionEventRequest.
+  3. EV Driver presents a valid IdToken; authorization succeeds; cable is plugged in; charging
+     starts.
+  4. Observe all TransactionEventRequest (eventType = Updated) messages sent by the Charging
+     Station during the charging session.
+Expected Result:
+  The Charging Station is permitted to send two or more TransactionEventRequest (eventType =
+  Updated) messages that share the same timestamp, each carrying a subset of the meter data.
+  All messages for the same split set MUST carry the same timestamp and belong to the same
+  transactionId. The CSMS must accept each message individually and respond with a
+  TransactionEventResponse for each.
+
+--------------------------------------------------------------------------------
+
+TC-E03-009
+Title: Signed meter values are placed in signedMeterValue field when SampledDataSignReadings is true
+Requirement: E03.FR.10
+Steps:
+  1. Set configuration variable SampledDataSignReadings to true on the Charging Station.
+  2. EV Driver presents a valid IdToken; authorization succeeds.
+  3. Cable is plugged in; charging starts.
+  4. Observe the sampledValues entries in any TransactionEventRequest that contains
+     meter data.
+Expected Result:
+  Each sampledValue entry that represents a signed meter reading includes a populated
+  signedMeterValue field containing the cryptographic signature data. The signedMeterValue
+  field MUST NOT be absent or empty when SampledDataSignReadings is true.
+
+--------------------------------------------------------------------------------
+
+TC-E03-010
+Title: Meter data with context Transaction.Begin is included in TransactionEventRequest (Updated, chargingState = Charging) when EVSE is not known at transaction start
+Requirement: E03.FR.11
+Steps:
+  1. Configure the Charging Station to send meter data in TransactionEventRequest
+     (eventType = Started).
+  2. Arrange conditions so that the EVSE is NOT known (not yet determined) at the time
+     the IdToken is presented (e.g. multi-EVSE station where EVSE is selected after
+     authorization).
+  3. EV Driver presents a valid IdToken; authorization succeeds.
+  4. EV Driver plugs in the cable on a specific EVSE; charging starts.
+  5. Observe the TransactionEventRequest (eventType = Updated) sent when charging starts.
+Expected Result:
+  The TransactionEventRequest (eventType = Updated, chargingState = Charging) contains
+  the meterValue field with measurands that would normally appear in the Started event,
+  each with context = Transaction.Begin. The TransactionEventRequest (eventType = Started)
+  sent earlier MUST NOT contain those measurands (EVSE was unknown at that point).
+
+--------------------------------------------------------------------------------
+
+TC-E03-011
+Title: TransactionEventRequest carries the most specific triggerReason matching the trigger event
+Requirement: E03.FR.12
+Steps:
+  1. EV Driver presents a valid IdToken; authorization succeeds.
+  2. Observe the TransactionEventRequest (eventType = Started) and verify triggerReason.
+  3. EV Driver plugs in the cable within EVConnectionTimeOut.
+  4. Observe the TransactionEventRequest (eventType = Updated) sent in response to the
+     cable plug-in event and verify triggerReason.
+  5. Charging starts.
+  6. Observe the TransactionEventRequest (eventType = Updated, chargingState = Charging)
+     and verify triggerReason.
+Expected Result:
+  - The Started TransactionEventRequest has triggerReason = Authorized.
+  - The Updated TransactionEventRequest triggered by cable plug-in has
+    triggerReason = CablePluggedIn (NOT ChargingStateChanged, as CablePluggedIn is
+    more specific).
+  - The Updated TransactionEventRequest triggered by the transition to the Charging state
+    has triggerReason = ChargingStateChanged.
+  Each trigger event that occurs while the transaction is ongoing MUST produce a separate
+  TransactionEventRequest; two simultaneous events MUST NOT be merged into one message.
+
+--------------------------------------------------------------------------------
+
+TC-E03-012
+Title: Charging Station reports numberOfPhasesUsed when energy transfer starts and phase reporting is supported
+Requirement: E03.FR.13
+Steps:
+  1. Use a Charging Station that is capable of reporting the number of phases used.
+  2. EV Driver presents a valid IdToken; authorization succeeds.
+  3. EV Driver plugs in the cable; charging starts.
+  4. Observe the TransactionEventRequest (eventType = Updated, chargingState = Charging)
+     sent to the CSMS.
+Expected Result:
+  The TransactionEventRequest (eventType = Updated, chargingState = Charging) contains the
+  numberOfPhasesUsed field set to the actual number of phases in use (e.g. 1 or 3). The
+  field MUST be present when the station supports phase reporting.
+
+--------------------------------------------------------------------------------
+
+TC-E03-013
+Title: Charging Station updates numberOfPhasesUsed when the number of phases changes during a transaction
+Requirement: E03.FR.14
+Steps:
+  1. Use a Charging Station that supports phase reporting (satisfying E03.FR.13).
+  2. EV Driver presents a valid IdToken; authorization succeeds; cable is plugged in;
+     charging starts on N phases.
+  3. Confirm that the initial TransactionEventRequest (Charging) includes numberOfPhasesUsed = N.
+  4. Trigger or simulate a change in the number of phases used during the active transaction
+     (e.g. from 3 phases to 1 phase).
+  5. Observe the next TransactionEventRequest sent by the Charging Station.
+Expected Result:
+  The Charging Station sends a new TransactionEventRequest (eventType = Updated) containing
+  the numberOfPhasesUsed field set to the new (adjusted) phase count. The field value MUST
+  reflect the current number of phases in use after the change.
+
+--------------------------------------------------------------------------------
+
+TC-E03-014
+Title: Charging Station deauthorizes transaction and sends EVConnectionTimeout event when cable is not plugged in before EVConnectionTimeOut and TxStopPoint contains ParkingBayOccupancy
+Requirement: E03.FR.15
+Steps:
+  1. Configure EVConnectionTimeOut to a short value (e.g. 30 seconds).
+  2. Configure TxStopPoint to include ParkingBayOccupancy.
+  3. EV Driver presents a valid IdToken; authorization succeeds.
+  4. Charging Station sends TransactionEventRequest (eventType = Started).
+  5. Do NOT plug in a charging cable.
+  6. Wait for the EVConnectionTimeOut duration to elapse.
+  7. Observe the message sent by the Charging Station to the CSMS.
+  8. Observe whether the transaction is ended immediately or remains open pending a
+     parking-bay-occupancy event.
+Expected Result:
+  The Charging Station sends a TransactionEventRequest with triggerReason = EVConnectionTimeout
+  to the CSMS. The transaction is deauthorized (the IdToken is no longer considered active
+  for charging purposes) but the transaction is NOT ended immediately; it will be ended
+  normally when the EV Driver leaves the parking bay. The TransactionEventRequest MUST NOT
+  carry eventType = Ended at this point (ending is deferred to the parking bay departure event).
+
+--------------------------------------------------------------------------------
+
+TC-E03-015
+Title: Full happy-path sequence: IdToken first, cable plugged in, charging starts
+Requirement: E03.FR.01, E03.FR.02, E03.FR.06, E03.FR.12
+Steps:
+  1. EV Driver presents a valid IdToken at the Charging Station.
+  2. Charging Station performs authorization; authorization succeeds.
+  3. Charging Station sends TransactionEventRequest (eventType = Started, triggerReason =
+     Authorized, transactionId = AB1234, seqNo = N) containing idToken.id.
+  4. CSMS responds with TransactionEventResponse (idTokenInfo.status = Accepted).
+  5. EV Driver plugs in the charging cable within EVConnectionTimeOut.
+  6. Charging Station sends StatusNotificationRequest (connectorStatus = Occupied) to CSMS.
+  7. CSMS responds with StatusNotificationResponse.
+  8. Charging Station sends TransactionEventRequest (eventType = Updated, transactionId =
+     AB1234, seqNo = N + 1, chargingState = EVConnected, triggerReason = CablePluggedIn).
+  9. CSMS responds with TransactionEventResponse.
+  10. If the connector is not permanently attached, the Charging Station locks the connector.
+  11. Charging Station starts energy offer.
+  12. Charging Station sends TransactionEventRequest (eventType = Updated, transactionId =
+      AB1234, seqNo = N + 2, chargingState = Charging, triggerReason = ChargingStateChanged).
+  13. CSMS responds with TransactionEventResponse.
+Expected Result:
+  - All three TransactionEventRequest messages are sent in the order: Started, Updated
+    (EVConnected), Updated (Charging).
+  - seqNo increments by 1 for each successive message within the same transaction.
+  - The CSMS sends a TransactionEventResponse for every TransactionEventRequest.
+  - Final system state: transaction is active, chargingState = Charging.
+  - Successful postcondition is met: a transaction is started and ChargingState is Charging.
+
+================================================================================
+END OF TEST CASES
+================================================================================

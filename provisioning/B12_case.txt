@@ -1,0 +1,165 @@
+B12 - Reset - With Ongoing Transaction - Test Cases
+
+GOAL: Allow the CSMS to reset a Charging Station or EVSE while transactions are in progress. The station must handle active transactions gracefully — either waiting for them to end (OnIdle) or terminating them immediately (Immediate) before rebooting.
+
+================================================================================
+
+TEST CASE 1: OnIdle reset with ongoing transaction — scheduled
+Scenario: CSMS requests an OnIdle reset while a transaction is running.
+Steps:
+  1. A transaction is in progress on the Charging Station.
+  2. CSMS sends ResetRequest(type = OnIdle) with no evseId.
+  3. Charging Station responds.
+  4. Charging Station waits for the transaction to end normally.
+  5. Charging Station reboots after the transaction ends.
+Expected result:
+  - Charging Station responds with ResetResponse(status = Scheduled).
+  - Charging Station sets all Available connectors/EVSEs to Unavailable.
+  - Charging Station waits for the transaction to end and sends TransactionEventRequest(eventType = Ended).
+  - Reboot occurs only after all transactions are closed and all Ended events are sent.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 2: Immediate reset with ongoing transaction — accepted, station terminates transaction
+Scenario: CSMS requests an Immediate reset while a transaction is in progress.
+Steps:
+  1. A transaction is in progress.
+  2. CSMS sends ResetRequest(type = Immediate) with no evseId.
+  3. Charging Station responds.
+  4. Charging Station attempts to terminate the transaction and send TransactionEventRequest(eventType = Ended, stopReason = ImmediateReset).
+  5. Charging Station reboots.
+Expected result:
+  - Charging Station responds with ResetResponse(status = Accepted).
+  - Charging Station attempts to unlock connectors (if not permanently attached) before rebooting.
+  - TransactionEventRequest(Ended) is sent before reboot if possible.
+  - Charging Station reboots and reconnects per B01.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 3: Immediate reset — TransactionEventResponse not received before timeout
+Scenario: After sending the TransactionEventRequest(Ended) during an Immediate reset, the response does not arrive in time.
+Steps:
+  1. Charging Station sends TransactionEventRequest(eventType = Ended) during Immediate reset.
+  2. CSMS does not respond within the timeout.
+  3. Charging Station reboots.
+  4. After reboot, Charging Station resends the queued TransactionEventRequest.
+Expected result:
+  - TransactionEventRequest is queued.
+  - Charging Station reboots as requested.
+  - Queued TransactionEventRequest is resent after reconnection.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 4: OnIdle reset — full station, no evseId — transaction ends normally
+Scenario: An OnIdle reset on the full station waits for any transaction to complete via E06 (Stop Transaction).
+Steps:
+  1. Charging Station has an active transaction.
+  2. CSMS sends ResetRequest(OnIdle) with no evseId.
+  3. Charging Station responds with Scheduled.
+  4. Transaction ends normally (EV user stops charging, E06 flow).
+  5. Charging Station sends all required TransactionEventRequest(Ended) messages.
+  6. Charging Station reboots.
+Expected result:
+  - Transaction is terminated normally according to E06.
+  - All Ended events are sent before the reboot.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 5: Immediate reset — full station, no evseId — transaction attempted to terminate
+Scenario: An Immediate reset forces the station to try to terminate any running transaction.
+Steps:
+  1. Charging Station has an active transaction.
+  2. CSMS sends ResetRequest(Immediate) with no evseId.
+  3. Charging Station responds with Accepted.
+  4. Charging Station attempts to terminate the transaction and send TransactionEventRequest(Ended).
+  5. Charging Station reboots.
+Expected result:
+  - Transaction termination is attempted (not guaranteed to complete before reboot).
+  - Reboot happens regardless.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 6: OnIdle reset on a specific EVSE — transaction ends normally on that EVSE
+Scenario: CSMS resets a specific EVSE (evseId supplied) while a transaction is active on it.
+Steps:
+  1. A transaction is in progress on the specific EVSE.
+  2. CSMS sends ResetRequest(OnIdle, evseId = X).
+  3. Charging Station responds with Scheduled.
+  4. Transaction on EVSE X ends normally (E06 flow).
+  5. Only EVSE X is rebooted.
+Expected result:
+  - Transaction on EVSE X is terminated normally before the EVSE reboot.
+  - Other EVSEs are unaffected.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 7: Immediate reset on a specific EVSE — transaction terminated forcefully
+Scenario: CSMS resets a specific EVSE immediately while a transaction is running.
+Steps:
+  1. A transaction is in progress on EVSE X.
+  2. CSMS sends ResetRequest(Immediate, evseId = X).
+  3. Charging Station responds with Accepted.
+  4. Charging Station attempts to terminate the transaction on EVSE X.
+  5. Charging Station sends TransactionEventRequest(Ended) for EVSE X.
+  6. EVSE X reboots.
+Expected result:
+  - Only transactions on EVSE X are terminated.
+  - Transactions on other EVSEs continue uninterrupted.
+  - EVSE X reboots after termination attempt.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 8: Station does not support individual EVSE resets — request rejected
+Scenario: CSMS supplies an evseId but the Charging Station does not support resetting individual EVSEs.
+Steps:
+  1. CSMS sends ResetRequest(OnIdle or Immediate, evseId = X).
+  2. Charging Station does not support individual EVSE resets.
+Expected result:
+  - Charging Station responds with ResetResponse(status = Rejected).
+
+--------------------------------------------------------------------------------
+
+TEST CASE 9: Unavailable (Inoperative) state persists after reboot
+Scenario: CSMS previously set an EVSE to Unavailable; after the reset, it must remain Unavailable.
+Steps:
+  1. CSMS set the EVSE to Unavailable (Inoperative) before the reset.
+  2. CSMS sends ResetRequest; station reboots.
+Expected result:
+  - After reboot, the EVSE returns to Unavailable state.
+  - Unavailable status is persistent across reboots.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 10: Available connectors are set to Unavailable before OnIdle reboot
+Scenario: During an OnIdle reset, the station marks all available connectors/EVSEs as Unavailable to prevent new transactions.
+Steps:
+  1. CSMS sends ResetRequest(OnIdle).
+  2. Charging Station responds with Scheduled.
+  3. Charging Station sends StatusNotificationRequest(Unavailable) for all Available connectors.
+Expected result:
+  - StatusNotification(Unavailable) is sent for all currently Available connectors.
+  - No new transactions can start on these connectors.
+
+--------------------------------------------------------------------------------
+
+TEST CASE 11: After full station reboot, Charging Station reconnects per B01
+Scenario: Verify that a full station reset (no evseId) leads to a B01 cold boot sequence.
+Steps:
+  1. CSMS sends ResetRequest with no evseId.
+  2. Charging Station accepts and reboots.
+Expected result:
+  - Charging Station reconnects and follows B01 cold boot flow (BootNotificationRequest, StatusNotifications, Heartbeats).
+
+--------------------------------------------------------------------------------
+
+TEST CASE 12: CSMS optionally notifies CSO after reset
+Scenario: After receiving a ResetResponse, the CSMS may notify the CSO.
+Steps:
+  1. CSMS sends ResetRequest.
+  2. Charging Station responds with ResetResponse.
+  3. CSMS optionally sends a notification to the CSO.
+Expected result:
+  - CSO notification (if sent) reflects the Charging Station's response.
+  - Absence of notification is not a failure.
+
+--------------------------------------------------------------------------------
